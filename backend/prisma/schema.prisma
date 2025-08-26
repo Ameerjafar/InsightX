@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CryptoCurrency {
+  BTC
+  SOL
+  ETH
+}
+
+enum CryptoType {
+  SELL
+  BUY
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  password  String
+  createdAt DateTime  @default(now())
+  balances  Balance[]
+}
+
+model Balance {
+  id           Int               @id @default(autoincrement())
+  USD          Int               @default(5000)
+  userId       Int
+  freeMargin   Int
+  lockedMargin Int
+  user         User              @relation(fields: [userId], references: [id])
+  asset        IndividualAsset[]
+}
+
+model IndividualAsset {
+  id          Int            @id @default(autoincrement())
+  cryptoValue Int
+  crypto      CryptoCurrency
+  type        CryptoType
+  BalanceId   Int            @unique
+  balance     Balance        @relation(fields: [BalanceId], references: [id])
+}
+
+model AssetsValue {
+  crypto    CryptoCurrency @id @default(BTC)
+  Price     Float
+  timestamp DateTime       @default(now())
+}
