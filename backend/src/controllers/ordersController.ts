@@ -117,12 +117,12 @@ export const closeOrder = async (req: Request, res: Response) => {
 
     const userBalance = await prisma.balance.findFirst({
       where: { userId: user.id },
-      include: { asset: true },
+      include: { assets: true },
     });
     if (!userBalance)
       return res.status(404).json({ message: "User balance not found" });
 
-    const userAsset = userBalance.asset.find((a) => a.crypto === asset);
+    const userAsset = userBalance.assets.find((a) => a.crypto === asset);
     if (!userAsset)
       return res.status(403).json({ message: "No asset to close" });
 

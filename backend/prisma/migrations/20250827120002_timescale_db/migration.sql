@@ -1,6 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS timescaledb;
-
-
 -- CreateEnum
 CREATE TYPE "CryptoCurrency" AS ENUM ('BTC', 'SOL', 'ETH');
 
@@ -46,7 +43,7 @@ CREATE TABLE "AssetsValue" (
     "Price" DOUBLE PRECISION NOT NULL,
     "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "AssetsValue_pkey" PRIMARY KEY ("crypto")
+    CONSTRAINT "AssetsValue_pkey" PRIMARY KEY ("crypto","timestamp")
 );
 
 -- CreateIndex
