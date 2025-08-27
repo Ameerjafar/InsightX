@@ -1,175 +1,162 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 
-interface openOrderObject {
-  type: "buy" | "sell";
+interface OpenOrderObject {
+  email: string;
+  type: "BUY" | "SELL";
   quantity: number;
   asset: string;
   stopLoss?: number;
   takeProfit?: number;
 }
-interface closeOrderObject {
-  type: "buy" | "sell";
+
+interface CloseOrderObject {
+  email: string;
+  type: "BUY" | "SELL";
   quantity: number;
-  asset: "BTC" | "ETH" | "SOL";
+  asset: string;
 }
+
 const prisma = new PrismaClient();
+
 export const openOrder = async (req: Request, res: Response) => {
-  const email: string | null = localStorage.getItem("Email");
-  if (!email) {
-    return res
-      .status(404)
-      .json({ message: "we cannot find your email address" });
-  }
-  const { type, quantity, asset, stopLoss, takeProfit }: openOrderObject =
-    req.body;
-  const user = await prisma.user.findMany({
-    where: {
-      email,
-    },
-  });
-  const userBalance = await prisma.balance.findMany({
-    where: {
-      userId: user[0]!.id,
-    },
-  });
-  try {
-    if (type === "buy") {
-      const assetValue = asset;
-      const cryptoValue = process.env[assetValue];
-      const canAfford =
-        userBalance[0]!.freeMargin >= parseInt(cryptoValue!) * quantity;
-      if (!canAfford) {
-        res.status(403).json({ message: "you don't have enough money to buy" });
-      } else {
-        const updateUserBalance = await prisma.balance.update({
-          where: {
-            id: userBalance[0]!.id,
-          },
-          data: {
-            USD: userBalance[0]!.USD - parseInt(cryptoValue!) * quantity,
-            freeMargin:
-              userBalance[0]!.freeMargin - parseInt(cryptoValue!) * quantity,
-            lockedMargin:
-              userBalance[0]!.lockedMargin + parseInt(cryptoValue!) * quantity,
-          },
-        });
-        const updateIndividualValue = await prisma.individualAsset.create({
-          data: {
-            BalanceId: userBalance[0]!.id,
-            cryptoValue: parseInt(cryptoValue!) * quantity,
-            type: "BUY",
-            crypto: asset as any,
-          },
-        });
-        return res.status(200).json({
-          message: "your are successfully buy the prediction",
-          updateIndividualValue,
-        });
-      }
-    } else {
-      const assetValue = asset;
-      const cryptoValue = process.env[assetValue];
-      const canAfford =
-        userBalance[0]!.freeMargin >= parseInt(cryptoValue!) * quantity;
-      if (!canAfford) {
-        return res
-          .status(403)
-          .json({ message: "you don't have enough money to buy" });
-      } else {
-        const updateUserBalance = await prisma.balance.update({
-          where: {
-            id: userBalance[0]!.id,
-          },
-          data: {
-            USD: userBalance[0]!.USD - parseInt(cryptoValue!) * quantity,
-            freeMargin: userBalance[0]!.USD - parseInt(cryptoValue!) * quantity,
-            lockedMargin:
-              userBalance[0]!.USD + parseInt(cryptoValue!) * quantity,
-          },
-        });
-        const updateIndividualValue = await prisma.individualAsset.create({
-          data: {
-            BalanceId: userBalance[0]!.id,
-            cryptoValue: parseInt(cryptoValue!) * quantity,
-            type: "SELL",
-            crypto: asset as any,
-          },
-        });
-        return res
-          .status(200)
-          .json({ message: "your are successfully sell the prediction" });
-      }
-    }
-  } catch (error) {
-    res.status(404).json({ message: error });
-  }
-};
+  const { email, type, quantity, asset }: OpenOrderObject = req.body;
 
-export const closeOrder = async (req: Request, res: Response) => {
-  const email: string | null = localStorage.getItem("email");
-  if (!email) {
-    return res.status(404).json({ message: "We cannot find your email" });
+  if (!email || !asset || !quantity) {
+    return res.status(400).json({ message: "Missing required fields" });
   }
-
-  const { type, quantity: quantity, asset }: closeOrderObject = req.body;
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     const userBalance = await prisma.balance.findFirst({
       where: { userId: user.id },
-      include: { asset: true },
     });
-    if (!userBalance) {
+    if (!userBalance)
       return res.status(404).json({ message: "User balance not found" });
-    }
-
-    const userIndividualAsset = userBalance.asset.find(
-      (a) => a.crypto === asset
-    );
-    if (!userIndividualAsset) {
-      return res
-        .status(403)
-        .json({ message: "You have not bought any order to close" });
-    }
 
     const cryptoValue = Number(process.env[asset]);
-    if (!cryptoValue) {
-      return res.status(500).json({ message: "Cannot get crypto value" });
-    }
+    if (!cryptoValue)
+      return res.status(500).json({ message: "Crypto value not available" });
 
-    let profitLoss = 0;
-    if (type === "buy") {
-      profitLoss = (cryptoValue - userIndividualAsset.cryptoValue) * quantity;
-    } else if (type === "sell") {
-      profitLoss = (userIndividualAsset.cryptoValue - cryptoValue) * quantity;
+    const totalCost = cryptoValue * quantity;
+    if (userBalance.freeMargin < totalCost) {
+      return res
+        .status(403)
+        .json({ message: "Insufficient free margin to buy" });
     }
 
     await prisma.balance.update({
       where: { id: userBalance.id },
       data: {
-        USD: { increment: profitLoss },
-        freeMargin: { increment: profitLoss },
-        lockedMargin: { decrement: userIndividualAsset.cryptoValue },
+        // USD: userBalance.USD - totalCost,
+        freeMargin: userBalance.freeMargin - totalCost,
+        lockedMargin: userBalance.lockedMargin + totalCost,
+      },
+    });
+    const order = await prisma.individualAsset.create({
+      data: {
+        BalanceId: userBalance.id,
+        cryptoValue: totalCost,
+        type,
+        quantity: 1,
+        crypto: asset as any,
       },
     });
 
-    if (userIndividualAsset.cryptoValue > quantity) {
-      await prisma.individualAsset.update({
-        where: { id: userIndividualAsset.id },
-        data: { cryptoValue: userIndividualAsset.cryptoValue - quantity },
-      });
-    } else {
-      await prisma.individualAsset.delete({
-        where: { id: userIndividualAsset.id },
-      });
+    return res
+      .status(200)
+      .json({ message: "Buy order placed successfully", order });
+    // } else {
+    //   if (userBalance.freeMargin < totalCost) {
+    //     return res.status(403).json({ message: "Insufficient free margin to sell" });
+    //   }
+
+    //   // if (!existingAsset || existingAsset.cryptoValue < totalCost) {
+    //   //   return res.status(403).json({ message: "Not enough asset to sell" });
+    //   // }
+
+    //   await prisma.balance.update({
+    //     where: { id: userBalance.id },
+    //     data: {
+    //       // USD: userBalance.USD - (userBalance.USD - (cryptoValue * quantity)),
+    //       freeMargin: userBalance.freeMargin - totalCost,
+    //       lockedMargin: userBalance.lockedMargin + totalCost,
+    //     },
+    //   });
+
+    //   const order = await prisma.individualAsset.create({
+    //     data: {
+    //       BalanceId: userBalance.id,
+    //       cryptoValue: totalCost,
+    //       type: "SELL",
+    //       crypto: asset as any,
+    //     },
+    //   });
+
+    return res
+      .status(200)
+      .json({ message: "Sell order placed successfully", order });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Error placing order", error });
+  }
+};
+
+export const closeOrder = async (req: Request, res: Response) => {
+  const { email, type, quantity, asset }: CloseOrderObject = req.body;
+
+  if (!email || !asset || !quantity) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const userBalance = await prisma.balance.findFirst({
+      where: { userId: user.id },
+      include: { asset: true },
+    });
+    if (!userBalance)
+      return res.status(404).json({ message: "User balance not found" });
+
+    const userAsset = userBalance.asset.find((a) => a.crypto === asset);
+    if (!userAsset)
+      return res.status(403).json({ message: "No asset to close" });
+
+    const cryptoValue = Number(process.env.CURRENT_VALUE_BUY);
+    if (!cryptoValue)
+      return res.status(500).json({ message: "Crypto value not available" });
+
+    const totalCloseValue = cryptoValue * quantity;
+
+    let profitLoss = 0;
+    if (type === "BUY") {
+      profitLoss = totalCloseValue - userAsset.cryptoValue;
+    } else if (type === "SELL") {
+      profitLoss = userAsset.cryptoValue - totalCloseValue;
     }
+    const releasedMargin = totalCloseValue; 
+    const updatedLockedMargin = Math.max(
+      userBalance.lockedMargin - releasedMargin,
+      0
+    );
+    const updatedFreeMargin =
+      userBalance.freeMargin + releasedMargin + profitLoss;
+    const updatedUSD = userBalance.USD + profitLoss;
+
+    await prisma.balance.update({
+      where: { id: userBalance.id },
+      data: {
+        USD: updatedUSD,
+        freeMargin: updatedFreeMargin,
+        lockedMargin: updatedLockedMargin,
+      },
+    });
+
+    await prisma.individualAsset.delete({ where: { id: userAsset.id } });
 
     return res.status(200).json({
       message: "Order closed successfully",
@@ -183,49 +170,36 @@ export const closeOrder = async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Error closing order", error });
   }
 };
+
 export const balanceController = async (req: Request, res: Response) => {
-  const email: string | null = localStorage.getItem("email");
-  if (!email) {
-    return res.status(404).json({ message: "we cannot find your email" });
-  }
+  const email = req.query.email as string;
+  if (!email) return res.status(400).json({ message: "Email required" });
+
   const user = await prisma.user.findFirst({
-    where: {
-      email,
-    },
-    include: {
-      balances: true,
-    },
+    where: { email },
+    include: { balances: true },
   });
-  if (!user) {
-    return res.status(404).json({ message: "we cannot find the user" });
-  } else {
-    return res.status(200).json({ message: user.balances[0]?.USD });
-  }
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  return res.status(200).json({ balance: user });
 };
 
-
 export const allOrders = async (req: Request, res: Response) => {
-    const email: string | null = localStorage.getItem("email");
-    if (!email) {
-      return res.status(404).json({ message: "we cannot find your email" });
-    }
-    const user = await prisma.user.findFirst({
-      where: {
-        email,
-      },
-      include: {
-        balances: true,
-      },
-    });
-    const allOrders = await prisma.individualAsset.findMany({
-        where: {
-            BalanceId: user!.balances[0]!.id
-        } 
-    })
-    if(!allOrders) {
-        res.status(200).json({message: "you have not placed any order yet"});
-    }
-    else {
-        res.status(200).json({message: allOrders})
-    }
-}
+  const email = req.query.email as string;
+  if (!email) return res.status(400).json({ message: "Email required" });
+
+  const user = await prisma.user.findFirst({
+    where: { email },
+    include: { balances: true },
+  });
+  if (!user || !user.balances[0])
+    return res.status(404).json({ message: "User or balance not found" });
+
+  const orders = await prisma.individualAsset.findMany({
+    where: { BalanceId: user.balances[0].id },
+  });
+  if (orders.length === 0)
+    return res.status(200).json({ message: "No orders placed yet" });
+
+  return res.status(200).json({ orders });
+};

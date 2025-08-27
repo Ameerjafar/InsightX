@@ -41,9 +41,9 @@ export const signup = async (req: Request, res: Response) => {
     })
     console.log("This is your current balance in your bank account", balance);
 
-    res.status(201).json({ message: "User registered successfully" });
+    return res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    return res.status(500).json({ message: "Server error", error });
   }
 };
 
@@ -63,7 +63,7 @@ export const signin = async (req: Request, res: Response) => {
 
     const isMatch = await bcrypt.compare(password, user!.password);
     if (!isMatch) {
-      res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
     const token = jwt.sign({email}, process.env.JWT_SECRET!, {expiresIn: 7})
@@ -76,9 +76,9 @@ export const signin = async (req: Request, res: Response) => {
     // })
     // console.log("This is your current balance in your bank account", balance);
     // localStorage.setItem("email", email);
-    res.status(200).json({ message: "Login successful", token });
+    return res.status(200).json({ message: "Login successful", token });
 
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    return res.status(500).json({ message: "Server error", error });
   }
 };

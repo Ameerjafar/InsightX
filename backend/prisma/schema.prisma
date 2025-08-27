@@ -44,7 +44,8 @@ model Balance {
 
 model IndividualAsset {
   id          Int            @id @default(autoincrement())
-  cryptoValue Int
+  cryptoValue Int 
+  quantity    Float
   crypto      CryptoCurrency
   type        CryptoType
   BalanceId   Int            @unique
