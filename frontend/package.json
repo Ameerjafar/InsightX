@@ -13,6 +13,8 @@
     "axios": "^1.11.0",
     "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
+    "lightweight-charts": "^5.0.8",
+    "lucide-react": "^0.542.0",
     "next": "15.5.2",
     "react": "19.1.0",
     "react-apexcharts": "^1.7.0",

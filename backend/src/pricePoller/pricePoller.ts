@@ -1,9 +1,10 @@
 import { WebSocketServer } from "ws";
 import { PrismaClient } from "@prisma/client";
-import { Redis } from "./redisClient.js"; // Your Redis class
+import { Redis } from "./redisClient.js";
 
 const prisma = new PrismaClient();
-const redisUrl = proces.env.REDIS_CLIENT;
+const redisUrl: string = process.env.REDIS_CLIENT as string;
+console.log(redisUrl);
 const redis = new Redis(redisUrl);
 
 const symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
@@ -16,7 +17,6 @@ const intervals = ["1m", "5m", "1h", "1d"];
   const wss = new WebSocketServer({ port: 8080 });
   console.log("🟢 WebSocket server running on ws://localhost:8080");
 
-  // Subscribe once to Redis channel
   await redis.subscribe("klinesChannel", (message: string) => {
     console.log("📩 Forwarding message from Redis to WebSocket clients");
     wss.clients.forEach((client) => {
@@ -24,12 +24,9 @@ const intervals = ["1m", "5m", "1h", "1d"];
     });
   });
 
-  // Handle new WebSocket connections
   wss.on("connection", (ws) => {
     console.log("🟢 New browser client connected");
   });
-
-  // Fetch Binance klines every 5 seconds and publish to Redis
   setInterval(async () => {
     try {
       console.log("Fetching Binance klines...");
@@ -41,17 +38,14 @@ const intervals = ["1m", "5m", "1h", "1d"];
 
         for (const interval of intervals) {
           const klines = await fetch(
-            `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=100`
+            `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=10`
           ).then((res) => res.json());
 
           allData[symbol][interval] = klines;
-
-          // Save in DB
           const dbSymbol = symbol.replace("USDT", "");
           for (const kline of klines) {
             const timestamp = new Date(kline[0]);
             const price = parseFloat(kline[4]);
-
             await prisma.assetsValue.upsert({
               where: {
                 crypto_timestamp: {
@@ -65,11 +59,9 @@ const intervals = ["1m", "5m", "1h", "1d"];
           }
         }
       }
-
-      // Publish all intervals to Redis
-      await redis.publish("klinesChannel", JSON.stringify({ type: "klines", data: allData }));
+      await redis.publish("klinesChannel", JSON.stringify({ type: "klines", data: allData}));
     } catch (err) {
       console.error("Error fetching Binance data:", err);
     }
-  }, 5000);
+  }, 3000);
 })();
