@@ -1,5 +1,3 @@
-
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -21,12 +19,11 @@ enum CryptoType {
   BUY
 }
 
-// Models
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
   password  String
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   balances  Balance[]
 }
 
@@ -51,9 +48,12 @@ model IndividualAsset {
 }
 
 model AssetsValue {
-  crypto    CryptoCurrency @default(BTC)
-  Price     Float
-  timestamp DateTime       @default(now())
+  crypto      CryptoCurrency @default(BTC)
+  buyPrice    Float
+  sellPrice   Float
+  bidQuantity Float
+  askQuantity Float
+  timestamp   DateTime       @default(now())
 
   @@id([crypto, timestamp])
   @@map("AssetsValue")

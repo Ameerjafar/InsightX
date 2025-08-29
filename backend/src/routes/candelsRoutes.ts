@@ -4,7 +4,7 @@ import { candlesController } from '../controllers/candlesController.js';
 const candleRoutes = express();
 
 
-candleRoutes.post('/candles', candlesController);
+candleRoutes.get('/', candlesController);
 
 
 export default candleRoutes;
