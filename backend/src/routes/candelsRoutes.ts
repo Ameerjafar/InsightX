@@ -1,10 +1,10 @@
 import express from 'express';
-import { candlesController } from '../controllers/candlesController.js';
+import { interValInfo } from '../controllers/candlesController.js';
 
 const candleRoutes = express();
 
 
-candleRoutes.get('/', candlesController);
+candleRoutes.get('/', interValInfo);
 
 
 export default candleRoutes;

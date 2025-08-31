@@ -8,6 +8,7 @@ interface OpenOrderObject {
   asset: string;
   stopLoss?: number;
   takeProfit?: number;
+  cryptoValue: number
 }
 
 interface CloseOrderObject {
@@ -15,12 +16,14 @@ interface CloseOrderObject {
   type: "BUY" | "SELL";
   quantity: number;
   asset: string;
+  cryptoValue: number
+  individualAssetId: number
 }
 
 const prisma = new PrismaClient();
 
 export const openOrder = async (req: Request, res: Response) => {
-  const { email, type, quantity, asset }: OpenOrderObject = req.body;
+  const { email, type, quantity, asset, cryptoValue, stopLoss, takeProfit }: OpenOrderObject = req.body;
 
   if (!email || !asset || !quantity) {
     return res.status(400).json({ message: "Missing required fields" });
@@ -36,38 +39,90 @@ export const openOrder = async (req: Request, res: Response) => {
     if (!userBalance)
       return res.status(404).json({ message: "User balance not found" });
 
-    const cryptoValue = Number(process.env[asset]);
+    // const cryptoValue = Number(process.env[asset]);
     if (!cryptoValue)
       return res.status(500).json({ message: "Crypto value not available" });
-
     const totalCost = cryptoValue * quantity;
+    console.log(totalCost);
     if (userBalance.freeMargin < totalCost) {
       return res
         .status(403)
         .json({ message: "Insufficient free margin to buy" });
     }
 
-    await prisma.balance.update({
-      where: { id: userBalance.id },
+    await prisma.balance.updateMany({
+      where: { userId: user.id },
       data: {
         // USD: userBalance.USD - totalCost,
         freeMargin: userBalance.freeMargin - totalCost,
         lockedMargin: userBalance.lockedMargin + totalCost,
       },
     });
-    const order = await prisma.individualAsset.create({
-      data: {
-        BalanceId: userBalance.id,
-        cryptoValue: totalCost,
-        type,
-        quantity: 1,
-        crypto: asset as any,
-      },
-    });
+    if(stopLoss && takeProfit) {
+      await prisma.individualAsset.create({
+        data: {
+          BalanceId: userBalance.id,
+          cryptoValue: totalCost,
+          type,
+          quantity,
+          stopLoss, 
+          takeProfit,
+          userId: user.id,
+          crypto: asset as any,
+        },
+      });
+    }
+    else if(stopLoss && !takeProfit) {
+      await prisma.individualAsset.create({
+        data: {
+          BalanceId: userBalance.id,
+          cryptoValue: totalCost,
+          type,
+          quantity,
+          stopLoss,
+          userId: user.id,
+          crypto: asset as any,
+        },
+      });
+    }
+    else if(takeProfit && !stopLoss) {
+      await prisma.individualAsset.create({
+        data: {
+          BalanceId: userBalance.id,
+          cryptoValue: totalCost,
+          type,
+          quantity,
+          takeProfit,
+          userId: user.id,
+          crypto: asset as any,
+        },
+      });
+    }
+    else {
+      await prisma.individualAsset.create({
+        data: {
+          BalanceId: userBalance.id,
+          cryptoValue: totalCost,
+          type,
+          quantity,
+          userId: user.id,
+          crypto: asset as any,
+        },
+      });
+    }
+    // const order = await prisma.individualAsset.create({
+    //   data: {
+    //     BalanceId: userBalance.id,
+    //     cryptoValue: totalCost,
+    //     type,
+    //     quantity: 1,
+    //     crypto: asset as any,
+    //   },
+    // });
 
     return res
       .status(200)
-      .json({ message: "Buy order placed successfully", order });
+      .json({ message: "Buy order placed successfully" });
     // } else {
     //   if (userBalance.freeMargin < totalCost) {
     //     return res.status(403).json({ message: "Insufficient free margin to sell" });
@@ -95,9 +150,9 @@ export const openOrder = async (req: Request, res: Response) => {
     //     },
     //   });
 
-    return res
-      .status(200)
-      .json({ message: "Sell order placed successfully", order });
+    // return res
+    //   .status(200)
+    //   .json({ message: "Sell order placed successfully", order });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Error placing order", error });
@@ -105,13 +160,13 @@ export const openOrder = async (req: Request, res: Response) => {
 };
 
 export const closeOrder = async (req: Request, res: Response) => {
-  const { email, type, quantity, asset }: CloseOrderObject = req.body;
+  const { email, type, quantity, asset, cryptoValue, individualAssetId }: CloseOrderObject = req.body;
 
   if (!email || !asset || !quantity) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  try {
+  try { 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -122,11 +177,16 @@ export const closeOrder = async (req: Request, res: Response) => {
     if (!userBalance)
       return res.status(404).json({ message: "User balance not found" });
 
-    const userAsset = userBalance.assets.find((a) => a.crypto === asset);
+    const userAsset = userBalance.assets.find((a) => a.id === individualAssetId);
+    // const assetDetail = await prisma.individualAsset.findUnique({
+    //   where: {
+    //     id: individualAssetId
+    //   }
+    // });
     if (!userAsset)
       return res.status(403).json({ message: "No asset to close" });
 
-    const cryptoValue = Number(process.env.CURRENT_VALUE_BUY);
+    // const cryptoValue = Number(process.env.CURRENT_VALUE_BUY);
     if (!cryptoValue)
       return res.status(500).json({ message: "Crypto value not available" });
 
@@ -138,17 +198,18 @@ export const closeOrder = async (req: Request, res: Response) => {
     } else if (type === "SELL") {
       profitLoss = userAsset.cryptoValue - totalCloseValue;
     }
-    const releasedMargin = totalCloseValue; 
-    const updatedLockedMargin = Math.max(
-      userBalance.lockedMargin - releasedMargin,
-      0
-    );
-    const updatedFreeMargin =
-      userBalance.freeMargin + releasedMargin + profitLoss;
+    const releasedMargin = Math.max(totalCloseValue, 0); 
+    // const updatedLockedMargin = Math.max(
+    //   userBalance.lockedMargin - releasedMargin,
+    //   0
+    // );
     const updatedUSD = userBalance.USD + profitLoss;
+    const updatedLockedMargin = Math.max(userBalance.lockedMargin - userAsset.cryptoValue, 0);
+    const updatedFreeMargin = updatedUSD - updatedLockedMargin;
+    
 
-    await prisma.balance.update({
-      where: { id: userBalance.id },
+    await prisma.balance.updateMany({
+      where: { userId: user.id },
       data: {
         USD: updatedUSD,
         freeMargin: updatedFreeMargin,

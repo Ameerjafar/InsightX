@@ -3,7 +3,6 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
 import z from 'zod'
-
 const objectSchema = z.object({
     email: z.string().email(),
     password: z.string().min(6)
@@ -66,7 +65,7 @@ export const signin = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({email}, process.env.JWT_SECRET!, {expiresIn: 7})
+    const token = jwt.sign({userId: user.id, email}, process.env.JWT_SECRET!, {expiresIn: 7})
 
     // const individualAsset = await prisma.individualAsset.create({
     //     data: {
@@ -76,7 +75,7 @@ export const signin = async (req: Request, res: Response) => {
     // })
     // console.log("This is your current balance in your bank account", balance);
     // localStorage.setItem("email", email);
-    return res.status(200).json({ message: "Login successful", token });
+    return res.status(200).json({ message: "Login successful", token, userId: user.id });
 
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });

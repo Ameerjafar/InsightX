@@ -7,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Enums
 enum CryptoCurrency {
   BTC
   SOL
@@ -25,6 +24,7 @@ model User {
   password  String
   createdAt DateTime  @default(now())
   balances  Balance[]
+  individualAssets IndividualAsset[]
 }
 
 model Balance {
@@ -43,18 +43,24 @@ model IndividualAsset {
   quantity    Float
   crypto      CryptoCurrency
   type        CryptoType
-  BalanceId   Int            @unique
+  stopLoss    Float?
+  takeProfit  Float?
+  userId      Int
+  user        User           @relation(fields: [userId], references: [id])
+  BalanceId   Int
   balance     Balance        @relation(fields: [BalanceId], references: [id])
 }
 
-model AssetsValue {
-  crypto      CryptoCurrency @default(BTC)
-  buyPrice    Float
-  sellPrice   Float
-  bidQuantity Float
-  askQuantity Float
-  timestamp   DateTime       @default(now())
+model OHLC {
+  id        Int      @id @default(autoincrement())
+  crypto    String
+  interval  String
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float
+  timestamp DateTime
 
-  @@id([crypto, timestamp])
-  @@map("AssetsValue")
+  @@unique([crypto, interval, timestamp], name: "crypto_interval_timestamp")
 }

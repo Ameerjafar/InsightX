@@ -5,8 +5,30 @@ export class Redis {
   private subscriber: RedisClientType;
 
   constructor(private url: string) {
-    this.client = createClient({ url });
-    this.subscriber = createClient({ url });
+    this.client = createClient({
+      url: this.url,
+      socket: {
+        reconnectStrategy: (retries) => {
+          if (retries > 10) {
+            return new Error("Too many retries, giving up!");
+          }
+          // retry after delay (ms)
+          return Math.min(retries * 100, 3000);
+        },
+      },
+    });
+
+    this.subscriber = createClient({
+      url: this.url,
+      socket: {
+        reconnectStrategy: (retries) => {
+          if (retries > 10) {
+            return new Error("Too many retries, giving up!");
+          }
+          return Math.min(retries * 100, 3000);
+        },
+      },
+    });
   }
 
   async connect() {
@@ -38,7 +60,14 @@ export class Redis {
       handler(message);
     });
   }
-
+  async clear() {
+    try {
+      this.client.FLUSHDB(); 
+      console.log('Redis cleared successfully');
+    } catch (err) {
+      console.error('Error clearing Redis:', err);
+    }
+  }
   async disconnect() {
     await this.subscriber.disconnect();
     await this.client.disconnect();
