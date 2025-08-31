@@ -1,6 +1,7 @@
 import WebSocket, { WebSocketServer } from "ws";
 import { Redis } from "../pricePoller/redisClient.js";
 import { PrismaClient } from "@prisma/client";
+import { closeOrderService } from "../services/closeOrderService.js";
 
 const prisma = new PrismaClient();
 const redis = new Redis(process.env.REDIS_CLIENT as string);
@@ -13,6 +14,7 @@ interface takeProfitObject {
   assetId: number;
   quantity: number;
   assetValue: number;
+  asset: "BTC" | "SOL" | "ETH";
 }
 
 interface stopLossObject {
@@ -22,6 +24,7 @@ interface stopLossObject {
   assetId: number;
   quantity: number;
   assetValue: number;
+  asset: "BTC" | "SOL" | "ETH";
 }
 const response = prisma.individualAsset.findMany({});
 const takeProfit: takeProfitObject[] = [];
@@ -35,6 +38,7 @@ for (const userAsset of response as any) {
       type: userAsset.type,
       quantity: userAsset.quantity,
       assetValue: userAsset.USD,
+      asset: userAsset.crypto,
     });
   }
   if (userAsset.stopLoss) {
@@ -45,6 +49,7 @@ for (const userAsset of response as any) {
       type: userAsset.type,
       quantity: userAsset.quantity,
       assetValue: userAsset.USD,
+      asset: userAsset.crypto,
     });
   }
 }
@@ -95,124 +100,47 @@ binanceWs.on("message", async (data: any) => {
   const bidPrice = parseFloat(parsed.b);
   const midPrice = (askPrice + bidPrice) / 2;
   takeProfit.forEach(async (profile) => {
-    if (bidPrice >= profile.takeProfit && profile.type === "BUY") {
-      const findUserBalance = await prisma.balance.findMany({
-        where: {
-          userId: profile.userId,
-        },
+    if (bidPrice >= profile.takeProfit || askPrice <= profile.takeProfit) {
+      const user = await prisma.user.findUnique({
+        where: { id: profile.userId },
       });
-      const originalInvestment = profile.assetValue * profile.quantity;
-      const currentValue = bidPrice * profile.quantity;
-      const profit = currentValue - originalInvestment;
-      const updatedBalance =findUserBalance[0]!.USD + profit;
-      const updateUserBAlance = await prisma.balance.updateMany({
-        where: {
-          userId: profile.userId,
-        },
-        data: {
-          USD: updatedBalance,
-        },
-      });
-      console.log("This is the updated balance", updateUserBAlance);
-      const response = await prisma.individualAsset.delete({
-        where: {
-          id: profile.assetId,
-          userId: profile.userId,
-        },
-      });
-      console.log("we are successfully taken the set profile", response);
-    }
-    if (askPrice <= profile.takeProfit && profile.type === "SELL") {
-      
-      const findUserBalance = await prisma.balance.findMany({
-        where: {
-          userId: profile.userId,
-        },
-      });
-      const originalInvestment = profile.assetValue * profile.quantity;
-      const currentValue = askPrice * profile.quantity;
-      const profit = originalInvestment - currentValue;
-      const updatedBalance =findUserBalance[0]!.USD + profit;
-      const updateUserBAlance = await prisma.balance.updateMany({
-        where: {
-          userId: profile.userId,
-        },
-        data: {
-          USD: updatedBalance
-        },
-      });
-      console.log("after updated the thing after the sell take profit", updateUserBAlance);
-      const response = await prisma.individualAsset.delete({
-        where: {
-          id: profile.assetId,
-          userId: profile.userId,
-        },
-      });
-      console.log("we are successfully taken the set profile", response);
+      if (!user?.email) return;
+      const assetObject = {
+        email: user.email,
+        quantity: profile.quantity,
+        type: profile.type,
+        cryptoValue: profile.assetValue,
+        individualAssetId: profile.assetId,
+        asset: profile.asset,
+      };
+      const closeOrderResponse = closeOrderService(assetObject);
+      console.log(closeOrderResponse);
     }
   });
 
   stopLoss.forEach(async (profile) => {
-    if (bidPrice <= profile.stopLoss && profile.type === "BUY") {
-      const findUserBalance = await prisma.balance.findMany({
-        where: {
-          userId: profile.userId,
-        },
+    if (bidPrice <= profile.stopLoss || askPrice >= profile.stopLoss) {
+      const user = await prisma.user.findUnique({
+        where: { id: profile.userId },
       });
-      const originalInvestment = profile.assetValue * profile.quantity;
-      const currentValue = bidPrice * profile.quantity;
-      const loss = originalInvestment - currentValue;
-      const updatedBalance =findUserBalance[0]!.USD - loss;
-      const updateUserBAlance = await prisma.balance.updateMany({
-        where: {
-          userId: profile.userId,
-        },
-        data: {
-          USD: updatedBalance,
-        },
-      });
-      console.log("This is the updated balance after the stop loss", updateUserBAlance);
-      const response = await prisma.individualAsset.delete({
-        where: {
-          id: profile.assetId,
-          userId: profile.userId,
-        },
-      });
-      console.log("we are successfully taken the set profile", response);
-    }
-    if (askPrice >= profile.stopLoss && profile.type === "SELL") {
-      const findUserBalance = await prisma.balance.findMany({
-        where: {
-          userId: profile.userId,
-        },
-      });
-      const originalInvestment = profile.assetValue * profile.quantity;
-      const currentValue = askPrice * profile.quantity;
-      const loss  = currentValue - originalInvestment;
-      const updatedBalance =findUserBalance[0]!.USD - loss;
-      const updateUserBAlance = await prisma.balance.updateMany({
-        where: {
-          userId: profile.userId,
-        },
-        data: {
-          USD: updatedBalance,
-        },
-      });
-      console.log("This is the updated balance", updateUserBAlance);
-      const response = await prisma.individualAsset.delete({
-        where: {
-          id: profile.assetId,
-          userId: profile.userId,
-        },
-      });
-      console.log("we are successfully taken the set profile", response);
+      if (!user?.email) return;
+      const assetObject = {
+        email: user.email,
+        quantity: profile.quantity,
+        type: profile.type,
+        cryptoValue: profile.assetValue,
+        individualAssetId: profile.assetId,
+        asset: profile.asset,
+      };
+      const closeOrderResponse = closeOrderService(assetObject);
+      console.log(closeOrderResponse);
     }
   });
   const bookTickerData: BookTickerData = {
     askPrice,
     bidPrice,
     midPrice,
-    timestamp: Date.now(), // bookTicker doesn't provide timestamp, so we use current time
+    timestamp: Date.now(),
   };
 
   intervals.forEach((intv) => {
@@ -240,9 +168,8 @@ intervals.forEach((intv) => {
       const bookTickers = buffer?.[intv];
       if (!bookTickers || bookTickers.length === 0) continue;
 
-      // For bookTicker data, we'll use mid prices to calculate OHLC
       const midPrices = bookTickers.map((t) => t.midPrice);
-      const volume = bookTickers.length; // Since bookTicker doesn't have volume, we use tick count
+      const volume = bookTickers.length;
 
       const ohlc = {
         open: midPrices[0] ?? 0,

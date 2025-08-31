@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-
+import { closeOrderService } from "../services/closeOrderService.js";
 interface OpenOrderObject {
   email: string;
   type: "BUY" | "SELL";
@@ -122,7 +122,7 @@ export const openOrder = async (req: Request, res: Response) => {
 
     return res
       .status(200)
-      .json({ message: "Buy order placed successfully" });
+      .json({ message: `${type} Buy order placed successfully` });
     // } else {
     //   if (userBalance.freeMargin < totalCost) {
     //     return res.status(403).json({ message: "Insufficient free margin to sell" });
@@ -159,76 +159,9 @@ export const openOrder = async (req: Request, res: Response) => {
   }
 };
 
-export const closeOrder = async (req: Request, res: Response) => {
-  const { email, type, quantity, asset, cryptoValue, individualAssetId }: CloseOrderObject = req.body;
-
-  if (!email || !asset || !quantity) {
-    return res.status(400).json({ message: "Missing required fields" });
-  }
-
-  try { 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const userBalance = await prisma.balance.findFirst({
-      where: { userId: user.id },
-      include: { assets: true },
-    });
-    if (!userBalance)
-      return res.status(404).json({ message: "User balance not found" });
-
-    const userAsset = userBalance.assets.find((a) => a.id === individualAssetId);
-    // const assetDetail = await prisma.individualAsset.findUnique({
-    //   where: {
-    //     id: individualAssetId
-    //   }
-    // });
-    if (!userAsset)
-      return res.status(403).json({ message: "No asset to close" });
-
-    // const cryptoValue = Number(process.env.CURRENT_VALUE_BUY);
-    if (!cryptoValue)
-      return res.status(500).json({ message: "Crypto value not available" });
-
-    const totalCloseValue = cryptoValue * quantity;
-
-    let profitLoss = 0;
-    if (type === "BUY") {
-      profitLoss = totalCloseValue - userAsset.cryptoValue;
-    } else if (type === "SELL") {
-      profitLoss = userAsset.cryptoValue - totalCloseValue;
-    }
-    const releasedMargin = Math.max(totalCloseValue, 0); 
-    // const updatedLockedMargin = Math.max(
-    //   userBalance.lockedMargin - releasedMargin,
-    //   0
-    // );
-    const updatedUSD = userBalance.USD + profitLoss;
-    const updatedLockedMargin = Math.max(userBalance.lockedMargin - userAsset.cryptoValue, 0);
-    const updatedFreeMargin = updatedUSD - updatedLockedMargin;
-    
-
-    await prisma.balance.updateMany({
-      where: { userId: user.id },
-      data: {
-        USD: updatedUSD,
-        freeMargin: updatedFreeMargin,
-        lockedMargin: updatedLockedMargin,
-      },
-    });
-
-    await prisma.individualAsset.delete({ where: { id: userAsset.id } });
-
-    return res.status(200).json({
-      message: "Order closed successfully",
-      profitLoss,
-      balance: await prisma.balance.findUnique({
-        where: { id: userBalance.id },
-      }),
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Error closing order", error });
+export const closeOrderController = async (req: Request, res: Response) => {
+  if(await closeOrderService(req.body)) {
+    res.status(200).json({message: "closed successfully"});
   }
 };
 
