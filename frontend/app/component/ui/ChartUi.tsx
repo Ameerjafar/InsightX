@@ -2,7 +2,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { ApexOptions } from "apexcharts";
-import { PricePoller } from "../PricePoller";
+import { PriceDisplay } from "../priceDisplay";
 import { TradingPanel } from "./TrackingPanel";
 import axios from "axios";
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
@@ -144,7 +144,7 @@ export default function ChartUi() {
               <div className="text-white text-lg font-semibold">Ask Price</div>
             </div> */}
               <div>
-                <PricePoller selectedSymbol={selectedSymbol} />
+                <PriceDisplay selectedSymbol={selectedSymbol} />
               </div>
             </div>
             <div className="flex space-x-3">

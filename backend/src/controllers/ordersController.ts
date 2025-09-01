@@ -132,7 +132,7 @@ export const allOrders = async (req: Request, res: Response) => {
     return res.status(404).json({ message: "User or balance not found" });
 
   const orders = await prisma.individualAsset.findMany({
-    where: { BalanceId: user.balances[0].id },
+    where: { userId: user.id },
   });
   if (orders.length === 0)
     return res.status(200).json({ message: "No orders placed yet" });

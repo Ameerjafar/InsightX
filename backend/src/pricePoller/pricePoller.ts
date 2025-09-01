@@ -1,70 +1,10 @@
 import WebSocket, { WebSocketServer } from "ws";
 import { Redis } from "../pricePoller/redisClient.js";
 import { PrismaClient } from "@prisma/client";
-import { closeOrderService } from "../services/closeOrderService.js";
-
+import { takeProfitAndStopLossHandler } from "../component/takeProfitAndStopLossHandler.js";
 const prisma = new PrismaClient();
 const redis = new Redis(process.env.REDIS_CLIENT as string);
 await redis.connect();
-
-interface takeProfitObject {
-  userId: number;
-  takeProfit: number;
-  type: "BUY" | "SELL";
-  assetId: number;
-  quantity: number;
-  assetValue: number;
-  asset: "BTC" | "SOL" | "ETH";
-}
-
-interface stopLossObject {
-  userId: number;
-  stopLoss: number;
-  type: "BUY" | "SELL";
-  assetId: number;
-  quantity: number;
-  assetValue: number;
-  asset: "BTC" | "SOL" | "ETH";
-}
-const response = prisma.individualAsset.findMany({});
-const takeProfit: takeProfitObject[] = [];
-const stopLoss: stopLossObject[] = [];
-for (const userAsset of response as any) {
-  const type = userAsset.type;
-  if(userAsset.leverageStatus) {
-    stopLoss.push({
-      assetId: userAsset.id,
-      userId: userAsset.userId,
-      type: userAsset.type,
-      stopLoss: type === 'BUY' ? userAsset.cryptoValue - 500 : userAsset.cryptoValue + 500,
-      quantity: userAsset.quantity,
-      assetValue: userAsset.cryptoValue,
-      asset: userAsset.crypto,
-    });
-  }
-  if (userAsset.takeProfit) {
-    takeProfit.push({
-      assetId: userAsset.id,
-      userId: userAsset.userId,
-      takeProfit: userAsset.takeProfit,
-      type: userAsset.type,
-      quantity: userAsset.quantity,
-      assetValue: userAsset.USD,
-      asset: userAsset.crypto,
-    });
-  }
-  if (userAsset.stopLoss) {
-    stopLoss.push({
-      assetId: userAsset.id,
-      userId: userAsset.userId,
-      stopLoss: userAsset.stopLoss,
-      type: userAsset.type,
-      quantity: userAsset.quantity,
-      assetValue: userAsset.USD,
-      asset: userAsset.crypto,
-    });
-  }
-}
 
 const wss = new WebSocketServer({ port: 8080 });
 console.log("🟢 WebSocket server running on ws://localhost:8080");
@@ -111,43 +51,7 @@ binanceWs.on("message", async (data: any) => {
   const askPrice = parseFloat(parsed.a);
   const bidPrice = parseFloat(parsed.b);
   const midPrice = (askPrice + bidPrice) / 2;
-  takeProfit.forEach(async (profile) => {
-    if (bidPrice >= profile.takeProfit || askPrice <= profile.takeProfit) {
-      const user = await prisma.user.findUnique({
-        where: { id: profile.userId },
-      });
-      if (!user?.email) return;
-      const assetObject = {
-        email: user.email,
-        quantity: profile.quantity,
-        type: profile.type,
-        cryptoValue: profile.assetValue,
-        individualAssetId: profile.assetId,
-        asset: profile.asset,
-      };
-      const closeOrderResponse = closeOrderService(assetObject);
-      console.log(closeOrderResponse);
-    }
-  });
-
-  stopLoss.forEach(async (profile) => {
-    if (bidPrice <= profile.stopLoss || askPrice >= profile.stopLoss) {
-      const user = await prisma.user.findUnique({
-        where: { id: profile.userId },
-      });
-      if (!user?.email) return;
-      const assetObject = {
-        email: user.email,
-        quantity: profile.quantity,
-        type: profile.type,
-        cryptoValue: profile.assetValue,
-        individualAssetId: profile.assetId,
-        asset: profile.asset,
-      };
-      const closeOrderResponse = closeOrderService(assetObject);
-      console.log(closeOrderResponse);
-    }
-  });
+  takeProfitAndStopLossHandler(bidPrice, askPrice);
   const bookTickerData: BookTickerData = {
     askPrice,
     bidPrice,

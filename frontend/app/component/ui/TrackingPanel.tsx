@@ -13,24 +13,30 @@ export const TradingPanel = () => {
   const [activeAsset, setActiveAsset] = useState<"BTC" | "ETH" | "SOL">("BTC");
   const [currentPrice, setCurrentPrice] = useState<number>(0);
   const [selectedLeverage, setSelectedLeverage] = useState<number>(1);
-
+  const [selectTakeProfit, setSelectTakeProfit] = useState(false);
+  const [selectStopLoss, setSelectStopLoss] = useState(false);
   // Fetch current price periodically
-  useEffect(() => {
-    const fetchPrice = async () => {
-      try {
-        const response = await axios.get(`http://localhost:5000/price?asset=${asset}`);
-        setCurrentPrice(response.data.price);
-      } catch (err) {
-        console.error("Error fetching price:", err);
-      }
-    };
+  // useEffect(() => {
+  //   const fetchPrice = async () => {
+  //     try {
+  //       const response = await axios.get(
+  //         `http://localhost:5000/price?asset=${asset}`
+  //       );
+  //       setCurrentPrice(response.data.price);
+  //     } catch (err) {
+  //       console.error("Error fetching price:", err);
+  //     }
+  //   };
 
-    fetchPrice();
-    const interval = setInterval(fetchPrice, 2000);
-    return () => clearInterval(interval);
-  }, [asset]);
+  //   fetchPrice();
+  //   const interval = setInterval(fetchPrice, 2000);
+  //   return () => clearInterval(interval);
+  // }, [asset]);
 
-  useEffect(() => setType(activeType.toUpperCase() as "BUY" | "SELL"), [activeType]);
+  useEffect(
+    () => setType(activeType.toUpperCase() as "BUY" | "SELL"),
+    [activeType]
+  );
   useEffect(() => setAsset(activeAsset), [activeAsset]);
 
   // Generate leverage options: 1x, 2x, 5x, 10x, 20x, 50x, 100x
@@ -41,11 +47,15 @@ export const TradingPanel = () => {
       <div className="border border-gray-500 mt-5 rounded-md p-4 bg-[#111315]">
         <div className="text-white text-xl font-bold mb-2">Trading Panel</div>
 
-        {/* Buy / Sell Toggle */}
         <div className="relative flex w-full mt-2 rounded-md bg-[#111315] h-12">
           <div
-            className={`absolute top-0 h-full w-1/2 bg-green-500 rounded-md transition-all duration-300`}
-            style={{ transform: activeType === "buy" ? "translateX(0%)" : "translateX(100%)" }}
+            className={`absolute top-0 h-full w-1/2 ${
+              activeType === "buy" ? "bg-green-500" : "bg-red-500"
+            } rounded-md transition-all duration-300`}
+            style={{
+              transform:
+                activeType === "buy" ? "translateX(0%)" : "translateX(100%)",
+            }}
           ></div>
 
           <button
@@ -65,11 +75,9 @@ export const TradingPanel = () => {
             Sell
           </button>
         </div>
-
-        {/* Asset Toggle (BTC / ETH / SOL) */}
         <div className="relative flex w-full mt-4 rounded-md bg-[#111315] h-12">
           <div
-            className={`absolute top-0 h-full w-1/3 bg-blue-500 rounded-md transition-all duration-300`}
+            className={`absolute top-0 h-full w-1/3 bg-yellow-300 rounded-md transition-all duration-300`}
             style={{
               transform:
                 activeAsset === "BTC"
@@ -106,14 +114,14 @@ export const TradingPanel = () => {
           </button>
         </div>
 
-        {/* Current Price */}
         <div className="flex justify-between items-center mt-4 p-3 bg-[#1a1c1e] rounded-md">
           <span className="text-white font-medium">Current Price:</span>
-          <span className="text-yellow-400 font-bold">{currentPrice.toFixed(2)}</span>
+          <span className="text-yellow-400 font-bold">
+            {currentPrice.toFixed(2)}
+          </span>
         </div>
-
-        {/* Leverage / Volume Buttons */}
-        <div className="flex flex-wrap gap-2 mt-4">
+        <div className="mt-4 font-semibold text-lg">leverage percentage</div>
+        <div className="flex flex-wrap gap-2 mt-2">
           {leverageOptions.map((lev) => (
             <button
               key={lev}
@@ -128,6 +136,50 @@ export const TradingPanel = () => {
             </button>
           ))}
         </div>
+        <div className="flex mt-2 font-semibold text-lg outline-0">
+          Margin(USD)
+        </div>
+        <div className="flex bg-[#1a1c1e] rounded-md outline-0">
+          <input
+            placeholder="0.01"
+            className="mt-2 text-white w-full p-2"
+          ></input>
+        </div>
+        <div className="flex justify-between mt-2">
+          <div className="mt-2 font-bold text-lg">Take Profit</div>
+          <button
+            onClick={() => {
+              setSelectTakeProfit(!selectTakeProfit);
+            }}
+            className="bg-[#1a1c1e] p-3 rounded-md font-bold hover:bg-green-500 hover:text-black"
+          >
+            {selectTakeProfit ? "ON" : "OFF"}
+          </button>
+        </div>
+        {selectTakeProfit && <div className="flex bg-[#1a1c1e] rounded-md outline-0 mt-3">
+          <input
+            placeholder="0.01"
+            className="mt-2 text-white w-full p-2"
+          ></input>
+        </div>}
+        <div className="flex justify-between mt-2">
+          <div className="mt-2 font-bold text-lg">Stop Loss</div>
+          <button
+            onClick={() => {
+              setSelectStopLoss(!selectStopLoss);
+            }}
+            className="bg-[#1a1c1e] p-3 rounded-md font-bold hover:bg-green-500 hover:text-black"
+          >
+            {selectStopLoss ? "ON" : "OFF"}
+          </button>
+        </div>
+        {selectStopLoss && <div className="flex bg-[#1a1c1e] rounded-md outline-0 mt-3">
+          <input
+            placeholder="0.01"
+            className="mt-2 text-white w-full p-2"
+          ></input>
+        </div>}
+        <button className = 'bg-green-500 w-full text-center mt-4 hover:bg-green-700 rounded-md p-3 font-bold'>Place Order</button>
       </div>
     </div>
   );

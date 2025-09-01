@@ -28,15 +28,14 @@ CREATE TABLE "Balance" (
 -- CreateTable
 CREATE TABLE "IndividualAsset" (
     "id" SERIAL NOT NULL,
-    "cryptoValue" INTEGER NOT NULL,
+    "cryptoValue" DOUBLE PRECISION NOT NULL,
     "quantity" DOUBLE PRECISION NOT NULL,
     "crypto" "CryptoCurrency" NOT NULL,
     "type" "CryptoType" NOT NULL,
     "stopLoss" DOUBLE PRECISION,
     "takeProfit" DOUBLE PRECISION,
     "userId" INTEGER NOT NULL,
-    "status" TEXT NOT NULL,
-    "leveratgePercent" INTEGER,
+    "leveragePercent" INTEGER,
     "leverageStatus" BOOLEAN NOT NULL,
     "BalanceId" INTEGER NOT NULL,
 
