@@ -36,41 +36,70 @@ export const closeOrderService = async ({
   if (!userAsset) throw new Error("No asset to close");
 
   if (!cryptoValue) throw new Error("Crypto value not available");
+  const spreadPercentage = 0.01; 
+  let adjustedCryptoValue: number;
 
-  const totalCloseValue = cryptoValue * quantity;
+  if (type === "BUY") {
+    adjustedCryptoValue = cryptoValue * (1 - spreadPercentage); 
+  } else {
+    adjustedCryptoValue = cryptoValue * (1 + spreadPercentage); 
+  }
+  const totalCloseValue = adjustedCryptoValue * quantity;
 
-  let profitLoss = 0;
+  let profitLoss: number;
   if (type === "BUY") {
     profitLoss = totalCloseValue - userAsset.cryptoValue;
-  } else if (type === "SELL") {
+  } else {
     profitLoss = userAsset.cryptoValue - totalCloseValue;
   }
 
-  const updatedUSD = userBalance.USD + profitLoss;
-  const updatedLockedMargin = Math.max(
-    userBalance.lockedMargin - userAsset.cryptoValue,
-    0
-  );
-  const updatedFreeMargin = updatedUSD - updatedLockedMargin;
+  const updateUserBalance = async () => {
+    try {
+      const transactionFee = totalCloseValue * 0.001; 
+      const netProfitLoss = profitLoss - transactionFee;
 
-  await prisma.balance.updateMany({
-    where: { userId: user.id },
-    data: {
-      USD: updatedUSD,
-      freeMargin: updatedFreeMargin,
-      lockedMargin: updatedLockedMargin,
-    },
-  });
+      const updatedUSD = userBalance.USD + netProfitLoss;
 
-  await prisma.individualAsset.delete({ where: { id: userAsset.id } });
+      const marginToRelease = userAsset.leverageStatus
+        ? userAsset.cryptoValue / userAsset.leveragePercent!
+        : userAsset.cryptoValue;
 
-  const updatedBalance = await prisma.balance.findUnique({
-    where: { id: userBalance.id },
-  });
+      const updatedLockedMargin = Math.max(
+        userBalance.lockedMargin - marginToRelease,
+        0
+      );
+      const updatedFreeMargin = updatedUSD - updatedLockedMargin;
 
-  return {
-    message: "Order closed successfully",
-    profitLoss,
-    balance: updatedBalance,
+      await prisma.balance.updateMany({
+        where: { userId: user.id },
+        data: {
+          USD: updatedUSD,
+          freeMargin: updatedFreeMargin,
+          lockedMargin: updatedLockedMargin,
+        },
+      });
+
+      await prisma.individualAsset.delete({
+        where: { id: individualAssetId },
+      });
+
+      const updatedBalance = await prisma.balance.findUnique({
+        where: { id: userBalance.id },
+      });
+
+      return {
+        message: "Order closed successfully",
+        profitLoss: netProfitLoss,
+        balance: updatedBalance,
+        spreadApplied: spreadPercentage * 100 + "%",
+        adjustedPrice: adjustedCryptoValue,
+        originalPrice: cryptoValue,
+      };
+    } catch (error) {
+      console.error("Failed to update user balance:", error);
+      throw error;
+    }
   };
+
+  return await updateUserBalance();
 };

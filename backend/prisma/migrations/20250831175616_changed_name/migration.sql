@@ -32,28 +32,43 @@ CREATE TABLE "IndividualAsset" (
     "quantity" DOUBLE PRECISION NOT NULL,
     "crypto" "CryptoCurrency" NOT NULL,
     "type" "CryptoType" NOT NULL,
+    "stopLoss" DOUBLE PRECISION,
+    "takeProfit" DOUBLE PRECISION,
+    "userId" INTEGER NOT NULL,
+    "status" TEXT NOT NULL,
+    "leveratgePercent" INTEGER,
+    "leverageStatus" BOOLEAN NOT NULL,
     "BalanceId" INTEGER NOT NULL,
 
     CONSTRAINT "IndividualAsset_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "AssetsValue" (
-    "crypto" "CryptoCurrency" NOT NULL DEFAULT 'BTC',
-    "Price" DOUBLE PRECISION NOT NULL,
-    "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE "OHLC" (
+    "id" SERIAL NOT NULL,
+    "crypto" TEXT NOT NULL,
+    "interval" TEXT NOT NULL,
+    "open" DOUBLE PRECISION NOT NULL,
+    "high" DOUBLE PRECISION NOT NULL,
+    "low" DOUBLE PRECISION NOT NULL,
+    "close" DOUBLE PRECISION NOT NULL,
+    "volume" DOUBLE PRECISION NOT NULL,
+    "timestamp" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "AssetsValue_pkey" PRIMARY KEY ("crypto","timestamp")
+    CONSTRAINT "OHLC_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "IndividualAsset_BalanceId_key" ON "IndividualAsset"("BalanceId");
+CREATE UNIQUE INDEX "OHLC_crypto_interval_timestamp_key" ON "OHLC"("crypto", "interval", "timestamp");
 
 -- AddForeignKey
 ALTER TABLE "Balance" ADD CONSTRAINT "Balance_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "IndividualAsset" ADD CONSTRAINT "IndividualAsset_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "IndividualAsset" ADD CONSTRAINT "IndividualAsset_BalanceId_fkey" FOREIGN KEY ("BalanceId") REFERENCES "Balance"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

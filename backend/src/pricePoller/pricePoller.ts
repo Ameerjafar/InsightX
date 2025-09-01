@@ -30,6 +30,18 @@ const response = prisma.individualAsset.findMany({});
 const takeProfit: takeProfitObject[] = [];
 const stopLoss: stopLossObject[] = [];
 for (const userAsset of response as any) {
+  const type = userAsset.type;
+  if(userAsset.leverageStatus) {
+    stopLoss.push({
+      assetId: userAsset.id,
+      userId: userAsset.userId,
+      type: userAsset.type,
+      stopLoss: type === 'BUY' ? userAsset.cryptoValue - 500 : userAsset.cryptoValue + 500,
+      quantity: userAsset.quantity,
+      assetValue: userAsset.cryptoValue,
+      asset: userAsset.crypto,
+    });
+  }
   if (userAsset.takeProfit) {
     takeProfit.push({
       assetId: userAsset.id,

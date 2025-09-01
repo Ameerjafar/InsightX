@@ -19,11 +19,11 @@ enum CryptoType {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  email     String    @unique
-  password  String
-  createdAt DateTime  @default(now())
-  balances  Balance[]
+  id               Int               @id @default(autoincrement())
+  email            String            @unique
+  password         String
+  createdAt        DateTime          @default(now())
+  balances         Balance[]
   individualAssets IndividualAsset[]
 }
 
@@ -38,17 +38,19 @@ model Balance {
 }
 
 model IndividualAsset {
-  id          Int            @id @default(autoincrement())
-  cryptoValue Int
-  quantity    Float
-  crypto      CryptoCurrency
-  type        CryptoType
-  stopLoss    Float?
-  takeProfit  Float?
-  userId      Int
-  user        User           @relation(fields: [userId], references: [id])
-  BalanceId   Int
-  balance     Balance        @relation(fields: [BalanceId], references: [id])
+  id              Int            @id @default(autoincrement())
+  cryptoValue     Float
+  quantity        Float
+  crypto          CryptoCurrency
+  type            CryptoType
+  stopLoss        Float?
+  takeProfit      Float?
+  userId          Int
+  leveragePercent Int?
+  leverageStatus  Boolean
+  user            User           @relation(fields: [userId], references: [id])
+  BalanceId       Int
+  balance         Balance        @relation(fields: [BalanceId], references: [id])
 }
 
 model OHLC {
