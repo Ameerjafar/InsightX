@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import toast from "react-hot-toast";
+import { usePricePoller } from "../hooks/usePricePoller";
 
 export const TradingPanel = () => {
-  const [placeOrder, setPlaceOrder] = useState(false);
   const [type, setType] = useState<"BUY" | "SELL">("BUY");
-  const [quantity, setQuantity] = useState<number>(0);
+  const [quantity, setQuantity] = useState<number>(0.01);
   const [email, setEmail] = useState<string>("");
   const [asset, setAsset] = useState<"BTC" | "ETH" | "SOL">("BTC");
   const [activeType, setActiveType] = useState<"buy" | "sell">("buy");
@@ -15,33 +16,56 @@ export const TradingPanel = () => {
   const [selectedLeverage, setSelectedLeverage] = useState<number>(1);
   const [selectTakeProfit, setSelectTakeProfit] = useState(false);
   const [selectStopLoss, setSelectStopLoss] = useState(false);
-  // Fetch current price periodically
-  // useEffect(() => {
-  //   const fetchPrice = async () => {
-  //     try {
-  //       const response = await axios.get(
-  //         `http://localhost:5000/price?asset=${asset}`
-  //       );
-  //       setCurrentPrice(response.data.price);
-  //     } catch (err) {
-  //       console.error("Error fetching price:", err);
-  //     }
-  //   };
+  const [currentPriceLoading, setCurrentPriceLoading] =
+    useState<boolean>(false);
+  const prices = usePricePoller();
 
-  //   fetchPrice();
-  //   const interval = setInterval(fetchPrice, 2000);
-  //   return () => clearInterval(interval);
-  // }, [asset]);
+  useEffect(() => {}, [prices]);
+  
+  // const [margin, setMargin] = useState<number>(0.01);
 
   useEffect(
     () => setType(activeType.toUpperCase() as "BUY" | "SELL"),
     [activeType]
   );
   useEffect(() => setAsset(activeAsset), [activeAsset]);
-
-  // Generate leverage options: 1x, 2x, 5x, 10x, 20x, 50x, 100x
   const leverageOptions = [1, 2, 5, 10, 20, 50, 100];
-
+  const sumbitHandler = async () => {
+    console.log(
+      "This is the body of openOrder",
+      email,
+      type,
+      quantity,
+      asset
+    );
+    const response = await axios.post(
+      "http://localhost:5000/orders/openOrder",
+      {
+        email: "r@gmail.com",
+        type,
+        quantity,
+        asset,
+        leverageStatus: false,
+        cryptoValue:
+          type === "BUY" ? prices[asset].ask[0] : prices[asset].bid[0],
+      }
+    );
+    console.log(response.data);
+    toast.success(`${type} order is placed`);
+  };
+  const quantiyController = (e) => {
+    console.log(e.target.value);
+    setQuantity(Number(e.target.value));
+    let price = 0;
+    if (type === "BUY") {
+      price = prices[asset].ask[0] * quantity;
+    } else {
+      price = prices[asset].bid[0] * quantity;
+    }
+    setCurrentPriceLoading(true);
+    setCurrentPrice(price);
+    setCurrentPriceLoading(false);
+  };
   return (
     <div className="text-white w-lg mr-11">
       <div className="border border-gray-500 mt-5 rounded-md p-4 bg-[#111315]">
@@ -113,13 +137,6 @@ export const TradingPanel = () => {
             SOL
           </button>
         </div>
-
-        <div className="flex justify-between items-center mt-4 p-3 bg-[#1a1c1e] rounded-md">
-          <span className="text-white font-medium">Current Price:</span>
-          <span className="text-yellow-400 font-bold">
-            {currentPrice.toFixed(2)}
-          </span>
-        </div>
         <div className="mt-4 font-semibold text-lg">leverage percentage</div>
         <div className="flex flex-wrap gap-2 mt-2">
           {leverageOptions.map((lev) => (
@@ -137,13 +154,24 @@ export const TradingPanel = () => {
           ))}
         </div>
         <div className="flex mt-2 font-semibold text-lg outline-0">
-          Margin(USD)
+          quantity
         </div>
         <div className="flex bg-[#1a1c1e] rounded-md outline-0">
           <input
+            onChange={quantiyController}
             placeholder="0.01"
             className="mt-2 text-white w-full p-2"
           ></input>
+        </div>
+        <div className="flex justify-between items-center mt-4 p-3 bg-[#1a1c1e] rounded-md">
+          <span className="text-white font-semibold">bid price</span>
+          {currentPriceLoading ? (
+            <div>Loading</div>
+          ) : (
+            <span className="text-yellow-400 font-bold">
+              {currentPrice.toFixed(2)}
+            </span>
+          )}
         </div>
         <div className="flex justify-between mt-2">
           <div className="mt-2 font-bold text-lg">Take Profit</div>
@@ -156,12 +184,14 @@ export const TradingPanel = () => {
             {selectTakeProfit ? "ON" : "OFF"}
           </button>
         </div>
-        {selectTakeProfit && <div className="flex bg-[#1a1c1e] rounded-md outline-0 mt-3">
-          <input
-            placeholder="0.01"
-            className="mt-2 text-white w-full p-2"
-          ></input>
-        </div>}
+        {selectTakeProfit && (
+          <div className="flex bg-[#1a1c1e] rounded-md outline-0 mt-3">
+            <input
+              placeholder="0.01"
+              className="mt-2 text-white w-full p-2"
+            ></input>
+          </div>
+        )}
         <div className="flex justify-between mt-2">
           <div className="mt-2 font-bold text-lg">Stop Loss</div>
           <button
@@ -173,13 +203,20 @@ export const TradingPanel = () => {
             {selectStopLoss ? "ON" : "OFF"}
           </button>
         </div>
-        {selectStopLoss && <div className="flex bg-[#1a1c1e] rounded-md outline-0 mt-3">
-          <input
-            placeholder="0.01"
-            className="mt-2 text-white w-full p-2"
-          ></input>
-        </div>}
-        <button className = 'bg-green-500 w-full text-center mt-4 hover:bg-green-700 rounded-md p-3 font-bold'>Place Order</button>
+        {selectStopLoss && (
+          <div className="flex bg-[#1a1c1e] rounded-md outline-0 mt-3">
+            <input
+              placeholder="0.01"
+              className="mt-2 text-white w-full p-2"
+            ></input>
+          </div>
+        )}
+        <button
+          onClick={sumbitHandler}
+          className="bg-green-500 w-full text-center mt-4 hover:bg-green-700 rounded-md p-3 font-bold"
+        >
+          Place Order
+        </button>
       </div>
     </div>
   );

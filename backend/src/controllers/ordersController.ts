@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { closeOrderService } from "../services/closeOrderService.js";
+
+// Use a single Prisma instance to prevent connection leaks
+const prisma = new PrismaClient();
+
 interface OpenOrderObject {
   email: string;
   type: "BUY" | "SELL";
@@ -9,12 +13,10 @@ interface OpenOrderObject {
   stopLoss?: number;
   takeProfit?: number;
   cryptoValue: number;
-
   leveragePercent: number;
   leverageStatus: boolean;
   leverageValue: number;
 }
-const prisma = new PrismaClient();
 
 export const openOrder = async (req: Request, res: Response) => {
   const {
@@ -28,7 +30,9 @@ export const openOrder = async (req: Request, res: Response) => {
     leverageStatus,
     leveragePercent,
   }: OpenOrderObject = req.body;
-
+  
+  console.log("Opening order:", email, asset, quantity);
+  
   if (!email || !asset || !quantity) {
     return res.status(400).json({ message: "Missing required fields" });
   }
@@ -41,69 +45,98 @@ export const openOrder = async (req: Request, res: Response) => {
       where: { userId: user.id },
     });
 
-    if (!userBalance)
+    if (!userBalance) {
       return res.status(404).json({ message: "User balance not found" });
-    if (!cryptoValue)
+    }
+    
+    if (!cryptoValue) {
       return res.status(500).json({ message: "Crypto value not available" });
+    }
 
     const totalCost = cryptoValue * quantity;
-    console.log("This is the total cost", totalCost);
-    console.log(totalCost);
+    console.log("Total cost:", totalCost);
+    
     const leverageMargin = cryptoValue / leveragePercent;
-    if (leverageStatus) {
-    }
+    
+    // Check if user has sufficient margin
     if (leverageStatus) {
       if (userBalance.freeMargin < (totalCost / leveragePercent)) {
-        return res
-          .status(200)
-          .json({ message: "You don't have balance to open this order" });
+        return res.status(403).json({ 
+          message: "Insufficient free margin to open this leveraged order" 
+        });
+      }
+    } else {
+      if (userBalance.freeMargin < totalCost) {
+        return res.status(403).json({ 
+          message: "Insufficient free margin to open this order" 
+        });
       }
     }
-    if (userBalance.freeMargin < (totalCost / leveragePercent)) {
-      return res
-        .status(403)
-        .json({ message: "Insufficient free margin to buy" });
-    }
 
-    await prisma.balance.updateMany({
-      where: { userId: user.id },
-      data: {
-        freeMargin: leverageStatus
-          ? userBalance.freeMargin - totalCost / leveragePercent 
-          : userBalance.freeMargin - totalCost,
-        lockedMargin: !leverageStatus
-          ? userBalance.lockedMargin + totalCost
-          : userBalance.lockedMargin + leverageMargin,
-      },
+    // Use transaction to ensure data consistency
+    await prisma.$transaction(async (tx) => {
+      // Update balance
+      await tx.balance.updateMany({
+        where: { userId: user.id },
+        data: {
+          freeMargin: leverageStatus
+            ? userBalance.freeMargin - totalCost / leveragePercent 
+            : userBalance.freeMargin - totalCost,
+          lockedMargin: !leverageStatus
+            ? userBalance.lockedMargin + totalCost
+            : userBalance.lockedMargin + leverageMargin,
+        },
+      });
+
+      // Create the asset
+      await tx.individualAsset.create({
+        data: {
+          BalanceId: userBalance.id,
+          cryptoValue: totalCost,
+          type,
+          quantity,
+          stopLoss: stopLoss || null,
+          takeProfit: takeProfit || null,
+          userId: user.id,
+          leverageStatus,
+          leveragePercent: leverageStatus ? leveragePercent : null,
+          crypto: asset as any,
+        },
+      });
     });
-    await prisma.individualAsset.create({
-      data: {
-        BalanceId: userBalance.id,
-        cryptoValue: totalCost,
-        type,
+
+    return res.status(200).json({ 
+      message: `${type} order placed successfully`,
+      orderDetails: {
+        asset,
         quantity,
-        stopLoss: stopLoss ? stopLoss : null,
-        takeProfit: takeProfit ? takeProfit : null,
-        userId: user.id,
+        totalCost,
         leverageStatus,
         leveragePercent: leverageStatus ? leveragePercent : null,
-        crypto: asset as any,
-      },
+        stopLoss: stopLoss || null,
+        takeProfit: takeProfit || null,
+      }
     });
 
-    return res
-      .status(200)
-      .json({ message: `${type} order placed successfully` });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Error placing order", error });
+    console.error("Error placing order:", error);
+    return res.status(500).json({ 
+      message: "Error placing order", 
+      error: error instanceof Error ? error.message : "Unknown error" 
+    });
   }
 };
 
 export const closeOrderController = async (req: Request, res: Response) => {
-  const response = await closeOrderService(req.body);
-  if (response) {
+  try {
+    const response = await closeOrderService(req.body);
     res.status(200).json({ message: response });
+  } catch (error) {
+    console.error("Error closing order:", error);
+    res.status(500).json({ 
+      message: "Error closing order", 
+      error: error instanceof Error ? error.message : "Unknown error" 
+    });
   }
 };
 
@@ -111,31 +144,57 @@ export const balanceController = async (req: Request, res: Response) => {
   const email = req.query.email as string;
   if (!email) return res.status(400).json({ message: "Email required" });
 
-  const user = await prisma.user.findFirst({
-    where: { email },
-    include: { balances: true },
-  });
-  if (!user) return res.status(404).json({ message: "User not found" });
+  try {
+    const user = await prisma.user.findFirst({
+      where: { email },
+      include: { balances: true },
+    });
+    
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-  return res.status(200).json({ balance: user });
+    return res.status(200).json({ balance: user });
+  } catch (error) {
+    console.error("Error fetching balance:", error);
+    return res.status(500).json({ 
+      message: "Error fetching balance", 
+      error: error instanceof Error ? error.message : "Unknown error" 
+    });
+  }
 };
 
 export const allOrders = async (req: Request, res: Response) => {
   const email = req.query.email as string;
   if (!email) return res.status(400).json({ message: "Email required" });
 
-  const user = await prisma.user.findFirst({
-    where: { email },
-    include: { balances: true },
-  });
-  if (!user || !user.balances[0])
-    return res.status(404).json({ message: "User or balance not found" });
+  try {
+    const user = await prisma.user.findFirst({
+      where: { email },
+      include: { balances: true },
+    });
+    
+    if (!user || !user.balances[0]) {
+      return res.status(404).json({ message: "User or balance not found" });
+    }
 
-  const orders = await prisma.individualAsset.findMany({
-    where: { userId: user.id },
-  });
-  if (orders.length === 0)
-    return res.status(200).json({ message: "No orders placed yet" });
+    const orders = await prisma.individualAsset.findMany({
+      where: { userId: user.id },
+    });
+    
+    if (orders.length === 0) {
+      return res.status(200).json({ message: "No orders placed yet" });
+    }
 
-  return res.status(200).json({ orders });
+    return res.status(200).json({ orders });
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    return res.status(500).json({ 
+      message: "Error fetching orders", 
+      error: error instanceof Error ? error.message : "Unknown error" 
+    });
+  }
+};
+
+// Cleanup function for graceful shutdown
+export const cleanup = async () => {
+  await prisma.$disconnect();
 };

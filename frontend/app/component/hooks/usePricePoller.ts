@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 
-type PriceValue = [number, boolean];
+export type PriceValue = [number, boolean];
 
-interface PriceData {
+export interface PriceData {
   BTC: { bid: PriceValue; ask: PriceValue };
   ETH: { bid: PriceValue; ask: PriceValue };
   SOL: { bid: PriceValue; ask: PriceValue };
@@ -47,7 +47,7 @@ export const usePricePoller = () => {
       }
     };
 
-    ws.onerror = (err) => console.error("WebSocket error:", err);
+    ws.onerror = (err) => console.log("WebSocket error:", err);
     ws.onclose = () => console.log("WebSocket closed");
 
     return () => wsRef.current?.close();
