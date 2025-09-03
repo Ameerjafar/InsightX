@@ -1,7 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-
-// Use a single Prisma instance to prevent connection leaks
-const prisma = new PrismaClient();
+import { prisma } from "../lib/prisma.js";
 
 interface CloseOrderInput {
   email: string;
@@ -74,10 +71,8 @@ export const closeOrderService = async ({
     );
     const updatedFreeMargin = updatedUSD - updatedLockedMargin;
 
-    // Use transaction to ensure data consistency
     const result = await prisma.$transaction(async (tx) => {
-      // Update balance
-      const updatedBalance = await tx.balance.updateMany({
+      const balanceUpdate = await tx.balance.updateMany({
         where: { userId: user.id },
         data: {
           USD: updatedUSD,
@@ -85,13 +80,12 @@ export const closeOrderService = async ({
           lockedMargin: updatedLockedMargin,
         },
       });
+      console.log(balanceUpdate);
 
-      // Delete the asset
       await tx.individualAsset.delete({
         where: { id: individualAssetId },
       });
 
-      // Return updated balance
       return await tx.balance.findUnique({
         where: { id: userBalance.id },
       });
@@ -112,7 +106,3 @@ export const closeOrderService = async ({
   }
 };
 
-// Cleanup function for graceful shutdown
-export const cleanup = async () => {
-  await prisma.$disconnect();
-};

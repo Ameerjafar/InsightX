@@ -1,11 +1,9 @@
 import WebSocket, { WebSocketServer } from "ws";
 import { Redis } from "../pricePoller/redisClient.js";
-import { PrismaClient } from "@prisma/client";
 import { takeProfitAndStopLossHandler } from "../component/takeProfitAndStopLossHandler.js";
+import { prisma } from "../lib/prisma.js";
 
-// Initialize price poller
 async function initializePricePoller() {
-  const prisma = new PrismaClient();
   const redis = new Redis(process.env.REDIS_CLIENT as string);
   
   try {

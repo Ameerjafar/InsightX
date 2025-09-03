@@ -1,9 +1,7 @@
 
 
-import { PrismaClient } from "@prisma/client";
 import { closeOrderService } from "../services/closeOrderService.js";
-
-const prisma = new PrismaClient();
+import { prisma } from "../lib/prisma.js";
 
 let assetCache: {
   takeProfit: Array<{

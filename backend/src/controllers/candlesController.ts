@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
 import { Request, Response } from "express";
-
-const prisma = new PrismaClient();
+import { prisma } from "../lib/prisma.js";
 export const interValInfo = async (req: Request, res: Response) => {
   const { asset, startTime, endTime, interval } = req.query;
   const currentInterval = interval as any;

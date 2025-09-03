@@ -1,14 +1,13 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
 import z from 'zod'
+import { prisma } from "../lib/prisma.js";
+
 const objectSchema = z.object({
     email: z.string().email(),
     password: z.string().min(6)
 })
-
-const prisma = new PrismaClient();
 
 export const signup = async (req: Request, res: Response) => {
   const { email, password } = req.body;

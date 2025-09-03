@@ -1,9 +1,6 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
 import { closeOrderService } from "../services/closeOrderService.js";
-
-// Use a single Prisma instance to prevent connection leaks
-const prisma = new PrismaClient();
+import { prisma } from "../lib/prisma.js";
 
 interface OpenOrderObject {
   email: string;
@@ -57,8 +54,7 @@ export const openOrder = async (req: Request, res: Response) => {
     console.log("Total cost:", totalCost);
     
     const leverageMargin = cryptoValue / leveragePercent;
-    
-    // Check if user has sufficient margin
+
     if (leverageStatus) {
       if (userBalance.freeMargin < (totalCost / leveragePercent)) {
         return res.status(403).json({ 
@@ -72,10 +68,7 @@ export const openOrder = async (req: Request, res: Response) => {
         });
       }
     }
-
-    // Use transaction to ensure data consistency
     await prisma.$transaction(async (tx) => {
-      // Update balance
       await tx.balance.updateMany({
         where: { userId: user.id },
         data: {
@@ -87,8 +80,6 @@ export const openOrder = async (req: Request, res: Response) => {
             : userBalance.lockedMargin + leverageMargin,
         },
       });
-
-      // Create the asset
       await tx.individualAsset.create({
         data: {
           BalanceId: userBalance.id,
@@ -194,7 +185,6 @@ export const allOrders = async (req: Request, res: Response) => {
   }
 };
 
-// Cleanup function for graceful shutdown
 export const cleanup = async () => {
   await prisma.$disconnect();
 };
