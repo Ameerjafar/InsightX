@@ -21,8 +21,7 @@ export const TradingPanel = () => {
   const prices = usePricePoller();
 
   useEffect(() => {}, [prices]);
-  
-  // const [margin, setMargin] = useState<number>(0.01);
+
 
   useEffect(
     () => setType(activeType.toUpperCase() as "BUY" | "SELL"),
@@ -41,7 +40,7 @@ export const TradingPanel = () => {
     const response = await axios.post(
       "http://localhost:5000/orders/openOrder",
       {
-        email: "r@gmail.com",
+        email: localStorage.getItem("userEmail"),
         type,
         quantity,
         asset,
@@ -68,7 +67,7 @@ export const TradingPanel = () => {
   };
   return (
     <div className="text-white w-lg mr-11">
-      <div className="border border-gray-500 mt-5 rounded-md p-4 bg-[#111315]">
+      <div className="border border-gray-500 mt-5 rounded-md p-4 bg-[#141619]">
         <div className="text-white text-xl font-bold mb-2">Trading Panel</div>
 
         <div className="relative flex w-full mt-2 rounded-md bg-[#111315] h-12">

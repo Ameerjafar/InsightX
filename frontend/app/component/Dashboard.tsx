@@ -2,12 +2,14 @@
 import axios from "axios";
 import { usePricePoller, type PriceData } from "./hooks/usePricePoller";
 import { Card } from "./ui/Card";
-import ChartUi from "./ui/ChartUi";
+import ChartUi from "./ui/ChartUI";
 import { OpenTrade } from "./ui/openTrade/OpenTrade";
 import { useEffect, useState } from "react";
 import { fetchOpenData } from "./services";
 import { calculateProfitLoss } from "./services";
 import { BalanceCard } from "./ui/BalanceCard";
+import AuthService from "./services/authService";
+import { Navigation } from "./ui/Navigation";
 
 type OpenTrade = {
   crypto: keyof PriceData;
@@ -28,19 +30,51 @@ export const Dashboard = () => {
     const openTradeHandler = async () => {
       try {
         const openTrades = await fetchOpenData();
-        const response = await axios.get(
-          "http://localhost:5000/orders/balance?email=r@gmail.com"
-        );
-        const userBalance = response.data.balance;
-        
         setAllTrades(openTrades as OpenTrade[]);
-        setInitialBalance(userBalance.balances[0].USD);
-        setUserDynamicBalance(userBalance.balances[0].USD);
         
-        // Store in localStorage for persistence
-        localStorage.setItem("userBalance", String(userBalance.balances[0].USD));
+        // Get balance from localStorage first
+        const storedBalance = AuthService.getUserBalance();
+        const storedFreeMargin = AuthService.getFreeMargin();
+        const storedLockedMargin = AuthService.getLockedMargin();
         
-        console.log("Initial balance set:", userBalance.balances[0].USD);
+        if (storedBalance > 0) {
+          setInitialBalance(storedBalance);
+          setUserDynamicBalance(storedBalance);
+          setFreeMargin(storedFreeMargin);
+          setTotalMargin(storedLockedMargin);
+        } else {
+          // Fallback to API call if no stored data
+          const userEmail = AuthService.getUserEmail();
+          if (userEmail) {
+            const response = await axios.get(
+              `${process.env.NEXT_PUBLIC_BACKEND_API || 'http://localhost:5000'}/api/orders/balance?email=${userEmail}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${AuthService.getToken()}`
+                }
+              }
+            );
+            const userBalance = response.data.balance;
+            
+            if (userBalance?.balances?.[0]?.USD) {
+              const balance = userBalance.balances[0].USD;
+              const freeMargin = userBalance.balances[0].freeMargin || 0;
+              const lockedMargin = userBalance.balances[0].lockedMargin || 0;
+              
+              setInitialBalance(balance);
+              setUserDynamicBalance(balance);
+              setFreeMargin(freeMargin);
+              setTotalMargin(lockedMargin);
+              
+              // Update localStorage
+              AuthService.storeUserData({
+                userBalance: balance,
+                freeMargin,
+                lockedMargin,
+              });
+            }
+          }
+        }
       } catch (error) {
         console.error("Error fetching initial data:", error);
       }
@@ -69,14 +103,13 @@ export const Dashboard = () => {
       totalProfitLoss += profitLoss;
       totalOpenTradesValue += openTrade.cryptoValue;
     });
-    
-    // Update dynamic balance (initial + profit/loss)
     const newDynamicBalance = initialBalance + totalProfitLoss;
     setUserDynamicBalance(newDynamicBalance);
-    
-    // Calculate margin
     setTotalMargin(totalOpenTradesValue);
-    setFreeMargin(newDynamicBalance - totalOpenTradesValue);
+    const newFreeMargin = newDynamicBalance - totalOpenTradesValue;
+    setFreeMargin(newFreeMargin);
+    AuthService.updateUserBalance(newDynamicBalance);
+    AuthService.updateMargins(newFreeMargin, totalOpenTradesValue);
     
   }, [prices, allTrades, initialBalance]);
 
@@ -89,8 +122,12 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#141619]">
-      <div>
-        <div className="flex p-20 pb-0 pl-10 text-3xl text-white font-bold">
+      {/* Navigation */}
+      <Navigation />
+      
+      {/* Header */}
+      <div className="p-20 pb-0 pl-10">
+        <div className="text-3xl text-white font-bold">
           Trading Dashboard
         </div>
       </div>

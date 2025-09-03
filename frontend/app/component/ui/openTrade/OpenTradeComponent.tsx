@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { usePricePoller } from "../../hooks/usePricePoller";
 import toast from "react-hot-toast";
 import { calculateProfitLoss, fetchOpenData } from "../../services";
+import { AuthService } from "../../services/authService";
 
 interface OpenTradeObject {
   id: number;
@@ -30,6 +31,13 @@ export const OpenTradeComponent = () => {
 
   useEffect(() => {
     const allTradesController = async () => {
+      // Only fetch data if user is authenticated
+      if (!AuthService.isAuthenticated()) {
+        setAllOpenTrades([]);
+        setIsLoading(false);
+        return;
+      }
+
       const openTrades = await fetchOpenData();
       if (!openTrades) {
         setAllOpenTrades([]);
@@ -40,6 +48,7 @@ export const OpenTradeComponent = () => {
     };
     allTradesController();
   }, []);
+
   const closeHandler = async (
     tradeId: number,
     leverageStatus: boolean,
@@ -47,28 +56,35 @@ export const OpenTradeComponent = () => {
     asset: "BTC" | "ETH" | "SOL",
     type: "BUY" | "SELL"
   ) => {
+    if (!AuthService.isAuthenticated()) {
+      toast.error("Please sign in to close orders");
+      return;
+    }
 
     setClosingTrades((prev) => new Set([...prev, tradeId]));
 
     try {
+      const token = AuthService.getToken();
       const response = await axios.post(
         "http://localhost:5000/orders/closeOrder",
         {
-          email: "r@gmail.com",
+          email: localStorage.getItem("userEmail"),
           quantity,
           asset,
           type,
           leverageStatus,
           individualAssetId: tradeId,
           cryptoValue:
-            type === "BUY" ? prices[asset].bid[0] : prices[asset].ask[0],
-        }
+            type === "BUY" ? prices[asset].ask[0] : prices[asset].bid[0],
+        },
+
       );
+      console.log("This is the current crypto value", prices[asset].ask[0], prices[asset].bid[0]);
 
       console.log("This is the close order we are made", response.data.message);
       toast.success("Order closed successfully!");
 
-      setAllOpenTrades((prev) => prev.filter((trade) => trade.id !== tradeId));
+      setAllOpenTrades((prev) => prev ? prev.filter((trade) => trade.id !== tradeId) : []);
     } catch (error) {
       console.error("Error closing order:", error);
       toast.error("Failed to close order");

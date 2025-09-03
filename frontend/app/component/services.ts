@@ -1,28 +1,18 @@
 import axios from "axios";
-import jwt from "jsonwebtoken";
 import toast from "react-hot-toast";
+
 export const fetchOpenData = async () => {
-  const token = localStorage.getItem("token");
-  if (!token) {
-    console.log("I did not find token on the local storage");
-    return;
-  }
-
-  const decodeData: any = jwt.decode(token);
-  if (!decodeData || !decodeData.email) {
-    console.log("Invalid token or email missing in token");
-    return;
-  }
-
+  const email = localStorage.getItem("userEmail");
   try {
     const response = await axios.get(
-      `http://localhost:5000/orders/allOrders?email=r@gmail.com`
+      `http://localhost:5000/orders/allOrders?email=${email}`,
     );
+    console.log("this is all your open trade", response.data.orders);
     return response.data.orders || []; 
   } catch (err) {
     console.error("Error fetching open data:", err);
     toast.error("Failed to fetch open trades");
-  } finally {
+    return [];
   }
 };
 
@@ -43,4 +33,3 @@ export const calculateProfitLoss = (
     return entryTotalValue - currentValue;
   }
 };
-fetchOpenData();

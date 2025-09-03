@@ -1,7 +1,5 @@
-const Home = () => {
-    return (
-        <div>This is the auth page.</div>
-    )
-}
+import SignInPage from "./signin/page";
 
-export default Home
+export default function AuthPage() {
+  return <SignInPage />;
+}
