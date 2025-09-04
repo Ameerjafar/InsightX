@@ -26,16 +26,17 @@ export const usePricePoller = () => {
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === "bookTicker") {
+        console.log("This is inside the book ticker")
         const { symbol, bookTicker }: { symbol: string, bookTicker: any} = data.data;
-
+        console.log("This is the bid price", bookTicker.bidPrice);
         setPrices((prev) => {
           if (!(symbol in prev)) return prev; 
           return {
-            ...prev,
+            ...prev, 
             [symbol]: {
               bid: [
                 bookTicker.bidPrice,
-                prev[symbol].bid[0] < bookTicker.bidPrice,
+                bookTicker.bidPrice > prev[symbol].bid[0],
               ],
               ask: [
                 bookTicker.askPrice,
@@ -44,6 +45,7 @@ export const usePricePoller = () => {
             },
           };
         });
+        console.log(prices);
       }
     };
 

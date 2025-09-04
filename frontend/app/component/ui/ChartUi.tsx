@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { ApexOptions } from "apexcharts";
 import { PriceDisplay } from "../priceDisplay";
 import { TradingPanel } from "./TrackingPanel";
-import axios from "axios";
 import { Candle, getDummyData, defaultDummyData } from "../data/dummyChartData";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
@@ -26,7 +25,7 @@ export default function ChartUi() {
       toolbar: {
         show: false,
       },
-      background: '#141619',
+      background: "#141619",
     },
     xaxis: {
       type: "datetime",
@@ -47,14 +46,14 @@ export default function ChartUi() {
       tickAmount: 7,
     },
     grid: {
-      borderColor: '#374151',
+      borderColor: "#374151",
       strokeDashArray: 5,
     },
     plotOptions: {
       candlestick: {
         colors: {
-          upward: '#10B981',
-          downward: '#EF4444',
+          upward: "#10B981",
+          downward: "#EF4444",
         },
         wick: {
           useFillColor: true,
@@ -62,41 +61,9 @@ export default function ChartUi() {
       },
     },
   };
-
-  // useEffect(() => {
-  //   console.log("This is running inside the use effect");
-  //   const fetchData = async () => {
-  //     try {
-  //       const response = await axios.get(
-  //         `http://localhost:5000/candles?asset=${selectedSymbol}&interval=${selectedInterval}&startTime=2025-08-30T09:36:00.000Z&endTime=2025-08-30T09:45:00.000Z`
-  //       );
-  //       console.log(response);
-  //       const candles = response.data.candles;
-  //       const Data = candles.map((candle: { timestamp: string; open: string; high: string; low: string; close: string }) => ({
-  //         x: new Date(candle.timestamp), 
-  //         y: [
-  //           parseFloat(candle.open),
-  //           parseFloat(candle.high),
-  //           parseFloat(candle.low),
-  //           parseFloat(candle.close),
-  //         ],
-  //       }));
-  //       console.log(candles);
-  //       setChartData(Data);
-  //     } catch (err) {
-  //       console.error(err);
-  //       // Fallback to dummy data if API fails
-  //       const dummyData = getDummyData(selectedSymbol);
-  //       setChartData(dummyData);
-  //     }
-  //   };
-
-  //   fetchData();
-  // }, [selectedSymbol, selectedInterval]);
-
   useEffect(() => {
     const dummyData = getDummyData(selectedSymbol);
-    console.log("This is the chartData", chartData)
+    console.log("This is the chartData", chartData);
     setChartData(dummyData);
   }, [selectedSymbol]);
 

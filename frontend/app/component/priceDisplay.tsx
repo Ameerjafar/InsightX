@@ -2,7 +2,7 @@ import { usePricePoller } from "./hooks/usePricePoller";
 
 export const PriceDisplay = ({ selectedSymbol }: { selectedSymbol: string }) => {
   const prices = usePricePoller();
-
+  console.log("hello price display", prices)
   const formatPrice = (value: [number, boolean]) => value[0].toFixed(2);
 
   const symbol = selectedSymbol.replace("USDT", "") as "BTC" | "ETH" | "SOL";
