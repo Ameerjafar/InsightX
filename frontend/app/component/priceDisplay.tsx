@@ -1,4 +1,4 @@
-import { usePricePoller } from "./hooks/usePricePoller";
+import { usePricePoller } from "../hooks/usePricePoller";
 
 export const PriceDisplay = ({ selectedSymbol }: { selectedSymbol: string }) => {
   const prices = usePricePoller();

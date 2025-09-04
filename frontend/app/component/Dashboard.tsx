@@ -1,14 +1,14 @@
 "use client";
 import axios from "axios";
-import { usePricePoller, type PriceData } from "./hooks/usePricePoller";
-import { Card } from "./ui/Card";
-import ChartUi from "./ui/ChartUI";
-import { OpenTrade } from "./ui/openTrade/OpenTrade";
+import { usePricePoller, type PriceData } from "../hooks/usePricePoller";
+import { Card } from "../UI/Card";
+import ChartUi from "../UI/ChartUI";
+import { OpenTrade } from "../openTrade/OpenTrade";
 import { useEffect, useState } from "react";
 import { fetchOpenData } from "./services";
 import { calculateProfitLoss } from "./services";
-import { BalanceCard } from "./ui/BalanceCard";
-import { Navigation } from "./ui/Navigation";
+import { BalanceCard } from "../UI/BalanceCard";
+import { Navigation } from "../UI/Navigation";
 
 type OpenTrade = {
   crypto: keyof PriceData;
@@ -24,20 +24,19 @@ export const Dashboard = () => {
   const [totalMargin, setTotalMargin] = useState<number>(0);
   const [freeMargin, setFreeMargin] = useState<number>(0);
 
-  // First useEffect: Fetch initial data and set up balance
   useEffect(() => {
     const openTradeHandler = async () => {
       try {
         const openTrades = await fetchOpenData();
         setAllTrades(openTrades as OpenTrade[]);
 
-        const storedBalance: string =  localStorage.getItem("userBalance")!;
+        const storedBalance: string = localStorage.getItem("userBalance")!;
         const storedFreeMargin = localStorage.getItem("freeMargin");
         const storedLockedMargin = localStorage.getItem("lockedMargin");
 
         if (Number(storedBalance) > 0) {
           setInitialBalance(parseFloat(storedBalance));
-          setUserDynamicBalance(parseFloat(storedBalance)); 
+          setUserDynamicBalance(parseFloat(storedBalance));
           setFreeMargin(parseFloat(storedFreeMargin!));
           setTotalMargin(parseFloat(storedLockedMargin!));
         } else {
@@ -46,7 +45,7 @@ export const Dashboard = () => {
             const response = await axios.get(
               `${
                 process.env.NEXT_PUBLIC_BACKEND_API || "http://localhost:5000"
-              }/orders/balance?email=${userEmail}`,
+              }/orders/balance?email=${userEmail}`
             );
             const userBalance = response.data.balance;
 
@@ -59,7 +58,7 @@ export const Dashboard = () => {
               setUserDynamicBalance(balance);
               setFreeMargin(freeMargin);
               setTotalMargin(lockedMargin);
-              
+
               localStorage.setItem("userBalance", balance);
               localStorage.setItem("freeMargin", freeMargin);
               localStorage.setItem("lockedMargin", lockedMargin);
@@ -99,7 +98,7 @@ export const Dashboard = () => {
     setFreeMargin(newFreeMargin);
     localStorage.setItem("userBalance", newDynamicBalance.toString());
     localStorage.setItem("freeMargin", newFreeMargin.toString());
-    localStorage.setItem("lockedMargin", totalOpenTradesValue.toString())
+    localStorage.setItem("lockedMargin", totalOpenTradesValue.toString());
   }, [prices, allTrades, initialBalance]);
   const isProfit = userDynamicBalance >= initialBalance;
   const profitLossAmount = userDynamicBalance - initialBalance;

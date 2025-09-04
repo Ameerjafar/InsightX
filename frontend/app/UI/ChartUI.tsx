@@ -2,7 +2,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { ApexOptions } from "apexcharts";
-import { PriceDisplay } from "../priceDisplay";
+import { PriceDisplay } from "../component/priceDisplay";
 import { TradingPanel } from "./TrackingPanel";
 import { Candle, getDummyData, defaultDummyData } from "../data/dummyChartData";
 

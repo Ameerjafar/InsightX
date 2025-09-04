@@ -2,9 +2,9 @@
 
 import axios from "axios";
 import { useState, useEffect } from "react";
-import { usePricePoller } from "../../hooks/usePricePoller";
+import { usePricePoller } from "../hooks/usePricePoller";
 import toast from "react-hot-toast";
-import { calculateProfitLoss, fetchOpenData } from "../../services";
+import { calculateProfitLoss, fetchOpenData } from "../component/services";
 
 interface OpenTradeObject {
   id: number;
