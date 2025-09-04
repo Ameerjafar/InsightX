@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 import { fetchOpenData } from "./services";
 import { calculateProfitLoss } from "./services";
 import { BalanceCard } from "./ui/BalanceCard";
-import AuthService from "./services/authService";
 import { Navigation } from "./ui/Navigation";
 
 type OpenTrade = {
@@ -31,47 +30,39 @@ export const Dashboard = () => {
       try {
         const openTrades = await fetchOpenData();
         setAllTrades(openTrades as OpenTrade[]);
-        
-        // Get balance from localStorage first
-        const storedBalance = AuthService.getUserBalance();
-        const storedFreeMargin = AuthService.getFreeMargin();
-        const storedLockedMargin = AuthService.getLockedMargin();
-        
-        if (storedBalance > 0) {
-          setInitialBalance(storedBalance);
-          setUserDynamicBalance(storedBalance);
-          setFreeMargin(storedFreeMargin);
-          setTotalMargin(storedLockedMargin);
+
+        const storedBalance: string =  localStorage.getItem("userBalance")!;
+        const storedFreeMargin = localStorage.getItem("freeMargin");
+        const storedLockedMargin = localStorage.getItem("lockedMargin");
+
+        if (Number(storedBalance) > 0) {
+          setInitialBalance(parseFloat(storedBalance));
+          setUserDynamicBalance(parseFloat(storedBalance)); 
+          setFreeMargin(parseFloat(storedFreeMargin!));
+          setTotalMargin(parseFloat(storedLockedMargin!));
         } else {
-          // Fallback to API call if no stored data
-          const userEmail = AuthService.getUserEmail();
+          const userEmail = localStorage.getItem("userEmail");
           if (userEmail) {
             const response = await axios.get(
-              `${process.env.NEXT_PUBLIC_BACKEND_API || 'http://localhost:5000'}/api/orders/balance?email=${userEmail}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${AuthService.getToken()}`
-                }
-              }
+              `${
+                process.env.NEXT_PUBLIC_BACKEND_API || "http://localhost:5000"
+              }/orders/balance?email=${userEmail}`,
             );
             const userBalance = response.data.balance;
-            
-            if (userBalance?.balances?.[0]?.USD) {
+
+            if (userBalance?.balances[0]?.USD) {
               const balance = userBalance.balances[0].USD;
               const freeMargin = userBalance.balances[0].freeMargin || 0;
               const lockedMargin = userBalance.balances[0].lockedMargin || 0;
-              
+
               setInitialBalance(balance);
               setUserDynamicBalance(balance);
               setFreeMargin(freeMargin);
               setTotalMargin(lockedMargin);
               
-              // Update localStorage
-              AuthService.storeUserData({
-                userBalance: balance,
-                freeMargin,
-                lockedMargin,
-              });
+              localStorage.setItem("userBalance", balance);
+              localStorage.setItem("freeMargin", freeMargin);
+              localStorage.setItem("lockedMargin", lockedMargin);
             }
           }
         }
@@ -83,14 +74,12 @@ export const Dashboard = () => {
   }, []);
 
   const prices = usePricePoller();
-
-  // Second useEffect: Calculate profit/loss and update dynamic balance
   useEffect(() => {
     if (!allTrades || !initialBalance) return;
-    
+
     let totalProfitLoss = 0;
     let totalOpenTradesValue = 0;
-    
+
     allTrades.forEach((openTrade) => {
       const profitLoss = calculateProfitLoss(
         openTrade.cryptoValue,
@@ -99,7 +88,7 @@ export const Dashboard = () => {
         prices[openTrade.crypto]?.bid[0] || 0,
         prices[openTrade.crypto]?.ask[0] || 0
       );
-      
+
       totalProfitLoss += profitLoss;
       totalOpenTradesValue += openTrade.cryptoValue;
     });
@@ -108,30 +97,26 @@ export const Dashboard = () => {
     setTotalMargin(totalOpenTradesValue);
     const newFreeMargin = newDynamicBalance - totalOpenTradesValue;
     setFreeMargin(newFreeMargin);
-    AuthService.updateUserBalance(newDynamicBalance);
-    AuthService.updateMargins(newFreeMargin, totalOpenTradesValue);
-    
+    localStorage.setItem("userBalance", newDynamicBalance.toString());
+    localStorage.setItem("freeMargin", newFreeMargin.toString());
+    localStorage.setItem("lockedMargin", totalOpenTradesValue.toString())
   }, [prices, allTrades, initialBalance]);
-
-  // Calculate if user is in profit or loss
   const isProfit = userDynamicBalance >= initialBalance;
   const profitLossAmount = userDynamicBalance - initialBalance;
-  const profitLossText = isProfit 
-    ? `+$${profitLossAmount.toFixed(2)} profit` 
+  const profitLossText = isProfit
+    ? `+$${profitLossAmount.toFixed(2)} profit`
     : `-$${Math.abs(profitLossAmount).toFixed(2)} loss`;
 
   return (
     <div className="min-h-screen bg-[#141619]">
       {/* Navigation */}
       <Navigation />
-      
+
       {/* Header */}
       <div className="p-20 pb-0 pl-10">
-        <div className="text-3xl text-white font-bold">
-          Trading Dashboard
-        </div>
+        <div className="text-3xl text-white font-bold">Trading Dashboard</div>
       </div>
-      
+
       <div className="flex justify-between p-10 pt-2 text-[#cac6ae] text-md">
         <div className="text-lg">
           Monitor your portfolio and trade efficiently
@@ -150,21 +135,21 @@ export const Dashboard = () => {
           svgNumber={0}
           isProfit={isProfit}
         />
-        
+
         <Card
           arg1="Total Margin"
           arg2={`$${totalMargin.toFixed(2)}`}
           arg3="Used in open trades"
           svgNumber={1}
         />
-        
+
         <Card
           arg1="Free Margin"
           arg2={`$${freeMargin.toFixed(2)}`}
           arg3="Available for trading"
           svgNumber={2}
         />
-        
+
         <Card
           arg1="Active Trades"
           arg2={allTrades ? allTrades.length.toString() : "0"}

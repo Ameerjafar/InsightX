@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { usePricePoller } from "../../hooks/usePricePoller";
 import toast from "react-hot-toast";
 import { calculateProfitLoss, fetchOpenData } from "../../services";
-import { AuthService } from "../../services/authService";
 
 interface OpenTradeObject {
   id: number;
@@ -31,12 +30,6 @@ export const OpenTradeComponent = () => {
 
   useEffect(() => {
     const allTradesController = async () => {
-      // Only fetch data if user is authenticated
-      if (!AuthService.isAuthenticated()) {
-        setAllOpenTrades([]);
-        setIsLoading(false);
-        return;
-      }
 
       const openTrades = await fetchOpenData();
       if (!openTrades) {
@@ -56,15 +49,10 @@ export const OpenTradeComponent = () => {
     asset: "BTC" | "ETH" | "SOL",
     type: "BUY" | "SELL"
   ) => {
-    if (!AuthService.isAuthenticated()) {
-      toast.error("Please sign in to close orders");
-      return;
-    }
 
     setClosingTrades((prev) => new Set([...prev, tradeId]));
 
     try {
-      const token = AuthService.getToken();
       const response = await axios.post(
         "http://localhost:5000/orders/closeOrder",
         {

@@ -1,8 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, User, TrendingUp, Settings } from "lucide-react";
-import AuthService from "../services/authService";
+import { LogOut, User, TrendingUp} from "lucide-react";
 
 export const Navigation = () => {
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -11,14 +10,21 @@ export const Navigation = () => {
   const router = useRouter();
 
   useEffect(() => {
-    const email = AuthService.getUserEmail();
-    const balance = AuthService.getUserBalance();
+    const email = localStorage.getItem("userEmail");
+
+    const balance: string = localStorage.getItem("userBalance")!;
+    console.log("this is the user balance", balance);
     setUserEmail(email);
-    setUserBalance(balance);
+    setUserBalance(Number(balance));
   }, []);
 
   const handleLogout = () => {
-    AuthService.clearUserData();
+    localStorage.removeItem("token");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("userBalance");
+    localStorage.removeItem("freeMargin");
+    localStorage.removeItem("lockedMargin");
     router.push("/auth");
   };
 
@@ -29,13 +35,10 @@ export const Navigation = () => {
   return (
     <nav className="bg-[#16191D] border-b border-gray-700 px-6 py-4">
       <div className="flex justify-between items-center">
-        {/* Logo */}
         <div className="flex items-center space-x-3">
           <TrendingUp className="h-8 w-8 text-[#FFCC29]" />
           <span className="text-xl font-bold text-white">InsightX</span>
         </div>
-
-        {/* User Menu */}
         <div className="relative">
           <button
             onClick={toggleDropdown}
@@ -47,8 +50,6 @@ export const Navigation = () => {
               ${userBalance.toFixed(2)}
             </div>
           </button>
-
-          {/* Dropdown Menu */}
           {isDropdownOpen && (
             <div className="absolute right-0 mt-2 w-64 bg-[#1E2328] border border-gray-600 rounded-xl shadow-2xl z-50">
               <div className="p-4 border-b border-gray-600">
